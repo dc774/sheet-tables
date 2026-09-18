@@ -70,9 +70,11 @@ function sheet_tables_block_editor_data() {
 		$tables
 	);
 
+	// JSON_HEX_TAG so a title containing "</script>" cannot end the script
+	// element early. Titles come from editors, who may lack unfiltered_html.
 	wp_add_inline_script(
 		generate_block_asset_handle( 'sheet-tables/table', 'editorScript' ),
-		'window.sheetTablesBlock = ' . wp_json_encode( array( 'tables' => $list ) ) . ';',
+		'window.sheetTablesBlock = ' . wp_json_encode( array( 'tables' => $list ), JSON_HEX_TAG | JSON_HEX_AMP ) . ';',
 		'before'
 	);
 }
