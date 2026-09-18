@@ -96,6 +96,64 @@ function sheet_tables_fetch( $post_id ) {
  * @return array{header: string[], rows: array[], fetched: int}|WP_Error
  */
 function sheet_tables_download( $settings ) {
+	$parsed = sheet_tables_read_sheet( $settings );
+
+	if ( is_wp_error( $parsed ) ) {
+		return $parsed;
+	}
+
+	// The whitelist. Before set_transient() and update_option(), so whatever
+	// is dropped here is never written anywhere.
+	$data = sheet_tables_project( $parsed, sheet_tables_column_names( $settings ) );
+
+	// A sheet whose header no longer matches any chosen column has changed
+	// shape. Treated as a failure, so the last good copy keeps serving rather
+	// than being replaced by an empty table.
+	if ( ! $data['header'] ) {
+		return new WP_Error( 'sheet_tables_no_columns', __( 'None of the chosen columns were found in the sheet\'s header row.', 'sheet-tables' ) );
+	}
+
+	$data['fetched'] = time();
+
+	return $data;
+}
+
+/**
+ * The URL to request for a sheet, given the URL an editor pasted.
+ *
+ * People paste the link from the address bar or the Share button, which is
+ * the sheet's editor, not its data. Google serves the same tab as CSV from an
+ * export URL built from the sheet ID and tab (gid), so that is requested
+ * instead. Anything else, including a Publish to web link, is used as is.
+ *
+ * @param string $url URL as stored.
+ * @return string
+ */
+function sheet_tables_csv_url( $url ) {
+	if ( ! preg_match( '#^https://docs\.google\.com/spreadsheets/d/([A-Za-z0-9_-]+)/?(?:edit|view)?(?:[?\#].*)?$#', $url, $sheet ) ) {
+		return $url;
+	}
+
+	$export = 'https://docs.google.com/spreadsheets/d/' . $sheet[1] . '/export?format=csv';
+
+	if ( preg_match( '/[?&#]gid=(\d+)/', $url, $tab ) ) {
+		$export .= '&gid=' . $tab[1];
+	}
+
+	return $export;
+}
+
+/**
+ * Request the sheet and parse it, all columns included.
+ *
+ * The result holds every column, so it must never be stored. It is used only
+ * by sheet_tables_download(), which whitelists it, and by the settings screen,
+ * which shows its header row to the editor and discards the rest.
+ *
+ * @param array $settings From sheet_tables_get_settings().
+ * @return array{header: string[], rows: array[]}|WP_Error
+ */
+function sheet_tables_read_sheet( $settings ) {
 	// Google will serve a long-stale copy of an export URL: the plain URL has
 	// been seen returning a version of a tab that had since been emptied,
 	// while the same URL with an unused parameter returned the current one. A
@@ -104,7 +162,7 @@ function sheet_tables_download( $settings ) {
 	// The safe variant refuses local and private addresses, so the URL field
 	// cannot be used to make the server request its own network.
 	$response = wp_safe_remote_get(
-		add_query_arg( 'cachebust', time(), $settings['url'] ),
+		add_query_arg( 'cachebust', time(), sheet_tables_csv_url( $settings['url'] ) ),
 		array(
 			'timeout'     => 15,
 			'redirection' => 5,
@@ -130,26 +188,7 @@ function sheet_tables_download( $settings ) {
 		return new WP_Error( 'sheet_tables_not_csv', __( 'The sheet URL returned a web page instead of CSV. Check that the sheet is still published.', 'sheet-tables' ) );
 	}
 
-	$parsed = sheet_tables_parse_csv( wp_remote_retrieve_body( $response ), $settings['markers'] );
-
-	if ( is_wp_error( $parsed ) ) {
-		return $parsed;
-	}
-
-	// The whitelist. Before set_transient() and update_option(), so whatever
-	// is dropped here is never written anywhere.
-	$data = sheet_tables_project( $parsed, sheet_tables_column_names( $settings ) );
-
-	// A sheet whose header no longer matches any chosen column has changed
-	// shape. Treated as a failure, so the last good copy keeps serving rather
-	// than being replaced by an empty table.
-	if ( ! $data['header'] ) {
-		return new WP_Error( 'sheet_tables_no_columns', __( 'None of the chosen columns were found in the sheet\'s header row.', 'sheet-tables' ) );
-	}
-
-	$data['fetched'] = time();
-
-	return $data;
+	return sheet_tables_parse_csv( wp_remote_retrieve_body( $response ), $settings['markers'] );
 }
 
 /**

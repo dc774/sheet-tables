@@ -27,3 +27,4 @@ require_once SHEET_TABLES_DIR . 'includes/post-type.php';
 require_once SHEET_TABLES_DIR . 'includes/settings.php';
 require_once SHEET_TABLES_DIR . 'includes/fetch.php';
 require_once SHEET_TABLES_DIR . 'includes/render.php';
+require_once SHEET_TABLES_DIR . 'includes/status.php';

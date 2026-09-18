@@ -1,8 +1,9 @@
 <?php
 /**
- * The [sheet_table] shortcode.
+ * The [sheet_table] shortcode and the Sheet Table block.
  *
- * Every cell is escaped as plain text. Never wp_kses_post() on sheet data: a
+ * Both go through sheet_tables_render(), so there is one table markup. Every
+ * cell is escaped as plain text. Never wp_kses_post() on sheet data: a
  * cell is untrusted input from anyone who can edit the spreadsheet, which is a
  * wider circle than the people who can edit this site.
  *
@@ -14,6 +15,99 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 add_shortcode( 'sheet_table', 'sheet_tables_shortcode' );
+add_action( 'init', 'sheet_tables_register_block' );
+add_action( 'init', 'sheet_tables_register_assets' );
+add_action( 'enqueue_block_editor_assets', 'sheet_tables_block_editor_data' );
+
+/**
+ * Register the block from its block.json.
+ */
+function sheet_tables_register_block() {
+	register_block_type(
+		SHEET_TABLES_DIR . 'block',
+		array( 'render_callback' => 'sheet_tables_render_block' )
+	);
+}
+
+/**
+ * Render the block.
+ *
+ * @param array $attributes Block attributes.
+ * @return string
+ */
+function sheet_tables_render_block( $attributes ) {
+	$html = sheet_tables_render( absint( $attributes['id'] ?? 0 ) );
+
+	if ( '' === $html ) {
+		return '';
+	}
+
+	return '<div ' . get_block_wrapper_attributes() . '>' . $html . '</div>';
+}
+
+/**
+ * Give the block's table picker the list of published tables.
+ */
+function sheet_tables_block_editor_data() {
+	$tables = get_posts(
+		array(
+			'post_type'   => SHEET_TABLES_POST_TYPE,
+			'post_status' => 'publish',
+			'numberposts' => -1,
+			'orderby'     => 'title',
+			'order'       => 'ASC',
+		)
+	);
+
+	$list = array_map(
+		function ( $table ) {
+			return array(
+				'id'    => $table->ID,
+				/* translators: 1: table title, 2: table ID. */
+				'title' => sprintf( __( '%1$s (#%2$d)', 'sheet-tables' ), $table->post_title, $table->ID ),
+			);
+		},
+		$tables
+	);
+
+	wp_add_inline_script(
+		generate_block_asset_handle( 'sheet-tables/table', 'editorScript' ),
+		'window.sheetTablesBlock = ' . wp_json_encode( array( 'tables' => $list ) ) . ';',
+		'before'
+	);
+}
+
+/**
+ * Register the front-end stylesheet and script.
+ *
+ * Enqueued by sheet_tables_render() only when a table is actually on the page.
+ */
+function sheet_tables_register_assets() {
+	wp_register_style(
+		'sheet-tables',
+		SHEET_TABLES_URL . 'assets/sheet-tables.css',
+		array(),
+		(string) filemtime( SHEET_TABLES_DIR . 'assets/sheet-tables.css' )
+	);
+
+	wp_register_script(
+		'sheet-tables',
+		SHEET_TABLES_URL . 'assets/sheet-tables.js',
+		array(),
+		(string) filemtime( SHEET_TABLES_DIR . 'assets/sheet-tables.js' ),
+		true
+	);
+
+	wp_localize_script(
+		'sheet-tables',
+		'sheetTablesL10n',
+		array(
+			'filter' => __( 'Filter rows', 'sheet-tables' ),
+			/* translators: 1: number of rows shown, 2: number of rows in the table. */
+			'count'  => __( 'Showing %1$s of %2$s rows', 'sheet-tables' ),
+		)
+	);
+}
 
 /**
  * Render [sheet_table id="123"].
@@ -53,9 +147,19 @@ function sheet_tables_render( $post_id ) {
 		return sheet_tables_editor_note( __( 'None of the chosen columns hold any values.', 'sheet-tables' ) );
 	}
 
+	wp_enqueue_style( 'sheet-tables' );
+
+	if ( $settings['sort'] || $settings['search'] ) {
+		wp_enqueue_script( 'sheet-tables' );
+	}
+
+	// The visitor tools are switched on by these attributes and built by the
+	// script, so with JavaScript off there are no controls that do nothing.
 	ob_start();
 	?>
-	<div class="sheet-tables">
+	<div class="sheet-tables"<?php echo $settings['sort'] ? ' data-sort' : ''; ?><?php echo $settings['search'] ? ' data-search' : ''; ?>>
+		<?php // Focusable and named, so keyboard users can scroll a wide table too. ?>
+		<div class="sheet-tables__scroll" role="region" tabindex="0" aria-label="<?php echo esc_attr( '' !== $settings['caption'] ? $settings['caption'] : get_the_title( $post ) ); ?>">
 		<table class="sheet-tables__table">
 			<?php if ( '' !== $settings['caption'] ) : ?>
 				<caption><?php echo esc_html( $settings['caption'] ); ?></caption>
@@ -77,6 +181,7 @@ function sheet_tables_render( $post_id ) {
 				<?php endforeach; ?>
 			</tbody>
 		</table>
+		</div>
 	</div>
 	<?php
 
@@ -98,7 +203,7 @@ function sheet_tables_editor_note( $message ) {
 }
 
 /**
- * The table IDs placed in a piece of content.
+ * The table IDs placed in a piece of content, as shortcodes or blocks.
  *
  * @param string $content Post content.
  * @return int[]
@@ -106,19 +211,43 @@ function sheet_tables_editor_note( $message ) {
 function sheet_tables_ids_in_content( $content ) {
 	$ids = array();
 
-	if ( ! has_shortcode( $content, 'sheet_table' ) ) {
-		return $ids;
-	}
+	if ( has_shortcode( $content, 'sheet_table' ) ) {
+		preg_match_all( '/' . get_shortcode_regex( array( 'sheet_table' ) ) . '/', $content, $matches );
 
-	preg_match_all( '/' . get_shortcode_regex( array( 'sheet_table' ) ) . '/', $content, $matches );
+		foreach ( $matches[3] as $atts ) {
+			$atts = shortcode_parse_atts( $atts );
 
-	foreach ( $matches[3] as $atts ) {
-		$atts = shortcode_parse_atts( $atts );
-
-		if ( ! empty( $atts['id'] ) ) {
-			$ids[] = absint( $atts['id'] );
+			if ( ! empty( $atts['id'] ) ) {
+				$ids[] = absint( $atts['id'] );
+			}
 		}
 	}
 
-	return array_unique( $ids );
+	if ( has_block( 'sheet-tables/table', $content ) ) {
+		$ids = array_merge( $ids, sheet_tables_ids_in_blocks( parse_blocks( $content ) ) );
+	}
+
+	return array_values( array_unique( $ids ) );
+}
+
+/**
+ * The table IDs in a list of parsed blocks, including nested ones.
+ *
+ * @param array[] $blocks Parsed blocks.
+ * @return int[]
+ */
+function sheet_tables_ids_in_blocks( $blocks ) {
+	$ids = array();
+
+	foreach ( $blocks as $block ) {
+		if ( 'sheet-tables/table' === $block['blockName'] && ! empty( $block['attrs']['id'] ) ) {
+			$ids[] = absint( $block['attrs']['id'] );
+		}
+
+		if ( ! empty( $block['innerBlocks'] ) ) {
+			$ids = array_merge( $ids, sheet_tables_ids_in_blocks( $block['innerBlocks'] ) );
+		}
+	}
+
+	return $ids;
 }

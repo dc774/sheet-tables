@@ -190,7 +190,26 @@ function sheet_tables_render_meta_box( $post ) {
 	$columns  = (string) get_post_meta( $post->ID, '_sheet_tables_columns', true );
 	$markers  = (string) get_post_meta( $post->ID, '_sheet_tables_markers', true );
 
+	$faults = sheet_tables_get_faults();
+
 	wp_nonce_field( 'sheet_tables_save', 'sheet_tables_nonce' );
+
+	if ( isset( $faults[ $post->ID ] ) ) :
+		?>
+		<div class="notice notice-warning inline">
+			<p>
+				<?php
+				printf(
+					/* translators: 1: date and time, 2: error message. */
+					esc_html__( 'The sheet could not be read, starting %1$s: %2$s Visitors see the last good copy, if there is one, until this is fixed.', 'sheet-tables' ),
+					esc_html( sheet_tables_format_time( $faults[ $post->ID ]['time'] ) ),
+					esc_html( $faults[ $post->ID ]['message'] )
+				);
+				?>
+			</p>
+		</div>
+		<?php
+	endif;
 	?>
 	<table class="form-table" role="presentation">
 		<tr>
@@ -204,12 +223,13 @@ function sheet_tables_render_meta_box( $post ) {
 			<th scope="row"><label for="sheet-tables-url"><?php esc_html_e( 'Sheet CSV URL', 'sheet-tables' ); ?></label></th>
 			<td>
 				<input type="url" id="sheet-tables-url" name="sheet_tables_url" class="large-text code" value="<?php echo esc_attr( $settings['url'] ); ?>" placeholder="https://">
-				<p class="description"><?php esc_html_e( 'In Google Sheets choose File, Share, Publish to web, pick the sheet and "Comma-separated values (.csv)", then paste the link here. It must start with https://.', 'sheet-tables' ); ?></p>
+				<p class="description"><?php esc_html_e( 'Paste the Google Sheets link for the tab you want, as long as the sheet is shared so that anyone with the link can view it. A "Publish to web" link in CSV format, or any other https link to a CSV file, also works.', 'sheet-tables' ); ?></p>
 			</td>
 		</tr>
 		<tr>
 			<th scope="row"><label for="sheet-tables-columns"><?php esc_html_e( 'Columns', 'sheet-tables' ); ?></label></th>
 			<td>
+				<?php sheet_tables_render_sheet_columns( $settings ); ?>
 				<textarea id="sheet-tables-columns" name="sheet_tables_columns" class="large-text code" rows="6"><?php echo esc_textarea( $columns ); ?></textarea>
 				<p class="description">
 					<?php esc_html_e( 'One column per line, in the order to show them, spelled exactly as in the sheet\'s header row. To show a different heading, add it after a bar, for example "Room | Location".', 'sheet-tables' ); ?>
@@ -229,7 +249,7 @@ function sheet_tables_render_meta_box( $post ) {
 			<td>
 				<input type="number" id="sheet-tables-cache" name="sheet_tables_cache_minutes" class="small-text" min="1" step="1" value="<?php echo esc_attr( $settings['cache_minutes'] ); ?>">
 				<?php esc_html_e( 'minutes', 'sheet-tables' ); ?>
-				<p class="description"><?php esc_html_e( 'How long a copy of the sheet is kept before it is read again.', 'sheet-tables' ); ?></p>
+				<p class="description"><?php esc_html_e( 'How long a copy of the sheet is kept before it is read again. Updating this table drops the copy, so the next page view reads the sheet again.', 'sheet-tables' ); ?></p>
 			</td>
 		</tr>
 		<tr>
@@ -248,6 +268,47 @@ function sheet_tables_render_meta_box( $post ) {
 		</tr>
 	</table>
 	<?php
+}
+
+/**
+ * List the sheet's header cells, so columns can be chosen without guessing
+ * at their spelling.
+ *
+ * Read live each time the screen loads and never stored. The full sheet is
+ * in memory only while this runs, and only its header row is printed, on an
+ * admin screen, to someone who can edit the table.
+ *
+ * @param array $settings From sheet_tables_get_settings().
+ */
+function sheet_tables_render_sheet_columns( $settings ) {
+	if ( '' === $settings['url'] ) {
+		return;
+	}
+
+	$sheet = sheet_tables_read_sheet( $settings );
+
+	if ( is_wp_error( $sheet ) ) {
+		printf(
+			'<p class="description">%s %s</p>',
+			esc_html__( 'Could not read the sheet to list its columns:', 'sheet-tables' ),
+			esc_html( $sheet->get_error_message() )
+		);
+		return;
+	}
+
+	$names = array_filter( $sheet['header'], 'strlen' );
+	$codes = array_map(
+		function ( $name ) {
+			return '<code>' . esc_html( $name ) . '</code>';
+		},
+		$names
+	);
+
+	printf(
+		'<p>%s %s</p>',
+		esc_html__( 'Columns in the sheet:', 'sheet-tables' ),
+		implode( ', ', $codes ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- each name escaped above.
+	);
 }
 
 add_action( 'save_post_' . SHEET_TABLES_POST_TYPE, 'sheet_tables_save_settings' );
@@ -304,6 +365,15 @@ function sheet_tables_save_settings( $post_id ) {
 function sheet_tables_flag_rejected_url( $location ) {
 	return add_query_arg( 'sheet_tables_url_refused', 1, $location );
 }
+
+add_filter(
+	'removable_query_args',
+	function ( $args ) {
+		// Cleared from the address bar once shown, so a reload does not repeat it.
+		$args[] = 'sheet_tables_url_refused';
+		return $args;
+	}
+);
 
 add_action( 'admin_notices', 'sheet_tables_rejected_url_notice' );
 
