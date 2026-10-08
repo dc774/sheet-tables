@@ -134,10 +134,24 @@ editor preview is `ServerSideRender`, so there is one markup.
 - The table sits in a scroll box (`role="region"`, `tabindex="0"`, named by
   the caption or the table's title) so a wide table can be scrolled from the
   keyboard.
-- The wrapper carries `data-sort` / `data-search` when those are switched on.
-  `assets/sheet-tables.js` builds the controls from those attributes, so
-  without JavaScript there are no dead controls. The script is enqueued only
-  when one of them is on; the stylesheet whenever a table renders.
+- The wrapper carries `data-sort`, `data-search`, `data-page-size` and
+  `data-separator` for the tools switched on, and each filter column's `<th>`
+  carries `data-facet` and `data-param` (`sheet_tables_param()`: the heading
+  through `sanitize_title()`). `assets/sheet-tables.js` builds the controls
+  from those attributes, so without JavaScript there are no dead controls and
+  the whole table shows. The script is enqueued only when a tool is on; the
+  stylesheet whenever a table renders.
+- In the script one `apply()` decides each row from the search text and every
+  dropdown (a cell's values split on the separator), then pages the matches.
+  Filtered-out rows get `hidden`; matching rows on other pages get the class
+  `sheet-tables__paged-out`, which print overrides, so print carries every
+  row. Sorting returns to page 1.
+- Filters are read from and written to the URL fragment
+  (`#program-strategy=School%20wellness`, `#search=...`) with
+  `history.replaceState`, and re-read on `hashchange`. The fragment, not the
+  query string, because it never reaches the server: it cannot collide with
+  WordPress query vars such as `year` or `search`, and does not split the page
+  cache. Values a column does not hold are ignored.
 
 ## Caching upstream
 

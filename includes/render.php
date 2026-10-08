@@ -104,9 +104,15 @@ function sheet_tables_register_assets() {
 		'sheet-tables',
 		'sheetTablesL10n',
 		array(
-			'filter' => __( 'Filter rows', 'sheet-tables' ),
+			'filter'   => __( 'Filter rows', 'sheet-tables' ),
 			/* translators: 1: number of rows shown, 2: number of rows in the table. */
-			'count'  => __( 'Showing %1$s of %2$s rows', 'sheet-tables' ),
+			'count'    => __( 'Showing %1$s of %2$s rows', 'sheet-tables' ),
+			'any'      => __( 'Any', 'sheet-tables' ),
+			'pages'    => __( 'Table pages', 'sheet-tables' ),
+			/* translators: 1: current page number, 2: number of pages. */
+			'page'     => __( 'Page %1$s of %2$s', 'sheet-tables' ),
+			'previous' => __( 'Previous', 'sheet-tables' ),
+			'next'     => __( 'Next', 'sheet-tables' ),
 		)
 	);
 }
@@ -149,17 +155,37 @@ function sheet_tables_render( $post_id ) {
 		return sheet_tables_editor_note( __( 'None of the chosen columns hold any values.', 'sheet-tables' ) );
 	}
 
+	$facets = array_intersect( $settings['facets'], $columns );
+
 	wp_enqueue_style( 'sheet-tables' );
 
-	if ( $settings['sort'] || $settings['search'] ) {
+	if ( $settings['sort'] || $settings['search'] || $facets || $settings['page_size'] ) {
 		wp_enqueue_script( 'sheet-tables' );
 	}
 
 	// The visitor tools are switched on by these attributes and built by the
 	// script, so with JavaScript off there are no controls that do nothing.
+	$attributes = array();
+
+	if ( $settings['sort'] ) {
+		$attributes['data-sort'] = '';
+	}
+
+	if ( $settings['search'] ) {
+		$attributes['data-search'] = '';
+	}
+
+	if ( $settings['page_size'] ) {
+		$attributes['data-page-size'] = $settings['page_size'];
+	}
+
+	if ( $facets ) {
+		$attributes['data-separator'] = $settings['separator'];
+	}
+
 	ob_start();
 	?>
-	<div class="sheet-tables"<?php echo $settings['sort'] ? ' data-sort' : ''; ?><?php echo $settings['search'] ? ' data-search' : ''; ?>>
+	<div class="sheet-tables"<?php foreach ( $attributes as $attribute => $value ) : ?> <?php echo esc_attr( $attribute ); ?>="<?php echo esc_attr( $value ); ?>"<?php endforeach; ?>>
 		<?php // Focusable and named, so keyboard users can scroll a wide table too. ?>
 		<div class="sheet-tables__scroll" role="region" tabindex="0" aria-label="<?php echo esc_attr( '' !== $settings['caption'] ? $settings['caption'] : get_the_title( $post ) ); ?>">
 		<table class="sheet-tables__table">
@@ -168,8 +194,12 @@ function sheet_tables_render( $post_id ) {
 			<?php endif; ?>
 			<thead>
 				<tr>
-					<?php foreach ( $columns as $name ) : ?>
-						<th scope="col"><?php echo esc_html( $settings['columns'][ $name ] ); ?></th>
+					<?php foreach ( $columns as $index => $name ) : ?>
+						<?php if ( in_array( $name, $facets, true ) ) : ?>
+							<th scope="col" data-facet data-param="<?php echo esc_attr( sheet_tables_param( $settings['columns'][ $name ], $index ) ); ?>"><?php echo esc_html( $settings['columns'][ $name ] ); ?></th>
+						<?php else : ?>
+							<th scope="col"><?php echo esc_html( $settings['columns'][ $name ] ); ?></th>
+						<?php endif; ?>
 					<?php endforeach; ?>
 				</tr>
 			</thead>
@@ -188,6 +218,22 @@ function sheet_tables_render( $post_id ) {
 	<?php
 
 	return ob_get_clean();
+}
+
+/**
+ * The name a filter dropdown uses in a link's #fragment.
+ *
+ * Taken from the heading visitors see, so a link reads naturally:
+ * "Program Strategy" becomes "program-strategy".
+ *
+ * @param string $heading Column heading.
+ * @param int    $index   Column position, used if the heading has no letters or digits.
+ * @return string
+ */
+function sheet_tables_param( $heading, $index ) {
+	$param = sanitize_title( $heading );
+
+	return '' !== $param ? $param : 'column-' . ( $index + 1 );
 }
 
 /**

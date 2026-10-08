@@ -72,6 +72,21 @@ function sheet_tables_meta_fields() {
 			'default'  => true,
 			'sanitize' => 'rest_sanitize_boolean',
 		),
+		'_sheet_tables_facets'        => array(
+			'type'     => 'string',
+			'default'  => '',
+			'sanitize' => 'sanitize_textarea_field',
+		),
+		'_sheet_tables_separator'     => array(
+			'type'     => 'string',
+			'default'  => ',',
+			'sanitize' => 'sanitize_text_field',
+		),
+		'_sheet_tables_page_size'     => array(
+			'type'     => 'integer',
+			'default'  => 0,
+			'sanitize' => 'absint',
+		),
 	);
 }
 
@@ -209,7 +224,9 @@ function sheet_tables_parse_row_filter( $text ) {
  * Links use the same "A | B" lines as columns: the column shown, then the
  * column holding its URL. A line with no bar makes a URL column link to itself.
  *
- * @return array{url: string, access: string, columns: array<string, string>, links: array<string, string>, row_filter: array, markers: string[], cache_minutes: int, caption: string, sort: bool, search: bool}
+ * Filter dropdowns are listed by source column name, one per line.
+ *
+ * @return array{url: string, access: string, columns: array<string, string>, links: array<string, string>, row_filter: array, markers: string[], cache_minutes: int, caption: string, sort: bool, search: bool, facets: string[], separator: string, page_size: int}
  */
 function sheet_tables_get_settings( $post_id ) {
 	$markers = explode( ',', (string) get_post_meta( $post_id, '_sheet_tables_markers', true ) );
@@ -225,6 +242,9 @@ function sheet_tables_get_settings( $post_id ) {
 		'caption'       => (string) get_post_meta( $post_id, '_sheet_tables_caption', true ),
 		'sort'          => (bool) get_post_meta( $post_id, '_sheet_tables_sort', true ),
 		'search'        => (bool) get_post_meta( $post_id, '_sheet_tables_search', true ),
+		'facets'        => array_map( 'strval', array_keys( sheet_tables_parse_columns( get_post_meta( $post_id, '_sheet_tables_facets', true ) ) ) ),
+		'separator'     => (string) get_post_meta( $post_id, '_sheet_tables_separator', true ),
+		'page_size'     => absint( get_post_meta( $post_id, '_sheet_tables_page_size', true ) ),
 	);
 }
 
@@ -392,6 +412,34 @@ function sheet_tables_render_meta_box( $post ) {
 			<td>
 				<label><input type="checkbox" name="sheet_tables_sort" value="1" <?php checked( $settings['sort'] ); ?>> <?php esc_html_e( 'Let visitors sort by any column', 'sheet-tables' ); ?></label><br>
 				<label><input type="checkbox" name="sheet_tables_search" value="1" <?php checked( $settings['search'] ); ?>> <?php esc_html_e( 'Show a box for filtering rows', 'sheet-tables' ); ?></label>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><label for="sheet-tables-facets"><?php esc_html_e( 'Filter dropdowns', 'sheet-tables' ); ?></label></th>
+			<td>
+				<textarea id="sheet-tables-facets" name="sheet_tables_facets" class="large-text code" rows="3"><?php echo esc_textarea( (string) get_post_meta( $post->ID, '_sheet_tables_facets', true ) ); ?></textarea>
+				<p class="description"><?php esc_html_e( 'Optional. Columns that get a dropdown of their values, one per line, spelled as under Columns.', 'sheet-tables' ); ?></p>
+				<p>
+					<label for="sheet-tables-separator"><?php esc_html_e( 'Values in one cell are separated by', 'sheet-tables' ); ?></label>
+					<input type="text" id="sheet-tables-separator" name="sheet_tables_separator" class="small-text code" value="<?php echo esc_attr( $settings['separator'] ); ?>">
+				</p>
+				<p class="description"><?php esc_html_e( 'So a cell holding "School, Worksite" appears under both values. Leave empty to treat each cell as one value.', 'sheet-tables' ); ?></p>
+				<p class="description">
+					<?php
+					printf(
+						/* translators: %s: example link. */
+						esc_html__( 'A link can open the table already filtered by adding the dropdown\'s heading and a value after #, for example %s. Spaces in the heading become hyphens.', 'sheet-tables' ),
+						'<code>' . esc_html( '/library/#program-strategy=School%20wellness' ) . '</code>'
+					);
+					?>
+				</p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><label for="sheet-tables-page-size"><?php esc_html_e( 'Rows per page', 'sheet-tables' ); ?></label></th>
+			<td>
+				<input type="number" id="sheet-tables-page-size" name="sheet_tables_page_size" class="small-text" min="0" step="1" value="<?php echo esc_attr( $settings['page_size'] ); ?>">
+				<p class="description"><?php esc_html_e( 'Optional. Split a long table into pages. 0 shows every row on one page.', 'sheet-tables' ); ?></p>
 			</td>
 		</tr>
 	</table>

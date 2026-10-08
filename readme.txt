@@ -4,7 +4,7 @@ Tags: google sheets, spreadsheet, table, csv, shortcode
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -29,6 +29,9 @@ It was built for sheets that are shared working documents, with columns the publ
 * Real table markup: a caption, column headers with `scope`, and escaped plain text in every cell.
 * Optional sorting by any column, keyboard operable, with `aria-sort`.
 * An optional filter box that announces how many rows match.
+* Optional dropdown filters for chosen columns. A cell such as "School, Worksite" counts under each of its values.
+* Optional paging for long tables.
+* Links that open a table already filtered, such as `/library/#program-strategy=School%20wellness`, for buttons on a landing page.
 * On a phone, each row becomes a block of labelled lines.
 * Prints the whole table, with the header repeated on each page.
 * Works without JavaScript: visitors get the complete table in sheet order.
@@ -105,6 +108,12 @@ The site's server reads the sheet when a table is shown and its stored copy has 
 Google Sheets is provided by Google: [Terms of Service](https://policies.google.com/terms), [Privacy Policy](https://policies.google.com/privacy).
 
 == Changelog ==
+
+= 1.1.0 =
+* Private sheets: read a sheet shared only with the site's Google service account.
+* Row filter: show only rows that meet conditions such as "Include? = Yes". Other rows are never stored.
+* Link columns: link a column's text to a web address held in another column.
+* Dropdown filters, paging, and links that open a table already filtered.
 
 = 1.0.0 =
 * First release.

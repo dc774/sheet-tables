@@ -24,13 +24,40 @@
 	vertical-align: top;
 }
 
-.sheet-tables__filter {
-	display: block;
+.sheet-tables__controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75em 1.5em;
+	align-items: flex-end;
 	margin-block-end: 0.5em;
 }
 
-.sheet-tables__filter input {
-	margin-inline-start: 0.5em;
+.sheet-tables__control {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25em;
+	max-width: 100%;
+}
+
+.sheet-tables__control select {
+	max-width: 100%;
+}
+
+/* Rows on other pages. Not [hidden], so print can still show them. */
+.sheet-tables__table tr.sheet-tables__paged-out {
+	display: none;
+}
+
+.sheet-tables__pager {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1em;
+	align-items: center;
+	margin-block-start: 0.5em;
+}
+
+.sheet-tables__pager[hidden] {
+	display: none;
 }
 
 .sheet-tables__count {
@@ -106,7 +133,8 @@
 
 	/* The display: block above outranks the browser's own [hidden] rule, so
 	 * rows the filter hides have to be hidden again here. */
-	.sheet-tables__table tr[hidden] {
+	.sheet-tables__table tr[hidden],
+	.sheet-tables__table tr.sheet-tables__paged-out {
 		display: none;
 	}
 
@@ -127,10 +155,12 @@
 	}
 }
 
-/* Print carries the whole table: every row, including any the filter hid,
- * with the header repeated on each page and no scroll box cutting it off. */
+/* Print carries the whole table: every row, including any the filters hid or
+ * paging set aside, with the header repeated on each page and no scroll box
+ * cutting it off. */
 @media print {
-	.sheet-tables__filter,
+	.sheet-tables__controls,
+	.sheet-tables__pager,
 	.sheet-tables__count,
 	.sheet-tables .sheet-tables__sort::after {
 		display: none;
@@ -148,7 +178,8 @@
 		break-inside: avoid;
 	}
 
-	.sheet-tables__table tr[hidden] {
+	.sheet-tables__table tr[hidden],
+	.sheet-tables__table tr.sheet-tables__paged-out {
 		display: table-row !important;
 	}
 }
