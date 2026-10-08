@@ -37,6 +37,16 @@ function sheet_tables_meta_fields() {
 			'default'  => '',
 			'sanitize' => 'sanitize_textarea_field',
 		),
+		'_sheet_tables_links'         => array(
+			'type'     => 'string',
+			'default'  => '',
+			'sanitize' => 'sanitize_textarea_field',
+		),
+		'_sheet_tables_row_filter'    => array(
+			'type'     => 'string',
+			'default'  => '',
+			'sanitize' => 'sanitize_textarea_field',
+		),
 		'_sheet_tables_markers'       => array(
 			'type'     => 'string',
 			'default'  => '',
@@ -147,10 +157,59 @@ function sheet_tables_parse_columns( $text ) {
 }
 
 /**
+ * Turn the row filter setting into conditions.
+ *
+ * One per line: "Column = value" or "Column != value". A line that is neither
+ * is kept with a null operator, so reading the sheet can refuse it rather
+ * than silently letting every row through.
+ *
+ * @param string $text The stored setting.
+ * @return array<int, array{line: string, column: string, op: string|null, value: string}>
+ */
+function sheet_tables_parse_row_filter( $text ) {
+	$conditions = array();
+
+	foreach ( preg_split( '/\R/', (string) $text ) as $line ) {
+		$line = trim( $line );
+
+		if ( '' === $line ) {
+			continue;
+		}
+
+		$op    = null;
+		$parts = array( $line, '' );
+
+		foreach ( array( '!=', '=' ) as $candidate ) {
+			if ( false !== strpos( $line, $candidate ) ) {
+				$op    = $candidate;
+				$parts = array_map( 'trim', explode( $candidate, $line, 2 ) );
+				break;
+			}
+		}
+
+		if ( '' === $parts[0] ) {
+			$op = null;
+		}
+
+		$conditions[] = array(
+			'line'   => $line,
+			'column' => $parts[0],
+			'op'     => $op,
+			'value'  => $parts[1],
+		);
+	}
+
+	return $conditions;
+}
+
+/**
  * A table's settings, parsed and ready to use.
  *
  * @param int $post_id Table post ID.
- * @return array{url: string, access: string, columns: array<string, string>, markers: string[], cache_minutes: int, caption: string, sort: bool, search: bool}
+ * Links use the same "A | B" lines as columns: the column shown, then the
+ * column holding its URL. A line with no bar makes a URL column link to itself.
+ *
+ * @return array{url: string, access: string, columns: array<string, string>, links: array<string, string>, row_filter: array, markers: string[], cache_minutes: int, caption: string, sort: bool, search: bool}
  */
 function sheet_tables_get_settings( $post_id ) {
 	$markers = explode( ',', (string) get_post_meta( $post_id, '_sheet_tables_markers', true ) );
@@ -159,6 +218,8 @@ function sheet_tables_get_settings( $post_id ) {
 		'url'           => (string) get_post_meta( $post_id, '_sheet_tables_url', true ),
 		'access'        => sheet_tables_sanitize_access( get_post_meta( $post_id, '_sheet_tables_access', true ) ),
 		'columns'       => sheet_tables_parse_columns( get_post_meta( $post_id, '_sheet_tables_columns', true ) ),
+		'links'         => sheet_tables_parse_columns( get_post_meta( $post_id, '_sheet_tables_links', true ) ),
+		'row_filter'    => sheet_tables_parse_row_filter( get_post_meta( $post_id, '_sheet_tables_row_filter', true ) ),
 		'markers'       => array_values( array_filter( array_map( 'trim', $markers ), 'strlen' ) ),
 		'cache_minutes' => sheet_tables_sanitize_minutes( get_post_meta( $post_id, '_sheet_tables_cache_minutes', true ) ),
 		'caption'       => (string) get_post_meta( $post_id, '_sheet_tables_caption', true ),
@@ -168,7 +229,7 @@ function sheet_tables_get_settings( $post_id ) {
 }
 
 /**
- * The source column names a table is allowed to read.
+ * The source column names a table shows, in display order.
  *
  * Cast back to strings because PHP turns a numeric array key such as "2024"
  * into an integer, which would then fail a strict comparison with the header.
@@ -176,8 +237,31 @@ function sheet_tables_get_settings( $post_id ) {
  * @param array $settings From sheet_tables_get_settings().
  * @return string[]
  */
-function sheet_tables_column_names( $settings ) {
+function sheet_tables_display_columns( $settings ) {
 	return array_map( 'strval', array_keys( $settings['columns'] ) );
+}
+
+/**
+ * The source column names a table is allowed to read: the whitelist.
+ *
+ * The columns shown, plus the columns that hold their link URLs. A URL
+ * column is stored because it was named under Links, but is shown only if it
+ * is also listed under Columns.
+ *
+ * @param array $settings From sheet_tables_get_settings().
+ * @return string[]
+ */
+function sheet_tables_column_names( $settings ) {
+	$shown = sheet_tables_display_columns( $settings );
+	$urls  = array();
+
+	foreach ( $settings['links'] as $column => $url_column ) {
+		if ( in_array( (string) $column, $shown, true ) ) {
+			$urls[] = (string) $url_column;
+		}
+	}
+
+	return array_values( array_unique( array_merge( $shown, $urls ) ) );
 }
 
 add_action( 'add_meta_boxes_' . SHEET_TABLES_POST_TYPE, 'sheet_tables_add_meta_box' );
@@ -261,6 +345,23 @@ function sheet_tables_render_meta_box( $post ) {
 				<p class="description">
 					<?php esc_html_e( 'One column per line, in the order to show them, spelled exactly as in the sheet\'s header row. To show a different heading, add it after a bar, for example "Room | Location".', 'sheet-tables' ); ?>
 					<strong><?php esc_html_e( 'Columns not listed here are dropped as soon as the sheet is read. They are never stored on this site or shown.', 'sheet-tables' ); ?></strong>
+				</p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><label for="sheet-tables-links"><?php esc_html_e( 'Links', 'sheet-tables' ); ?></label></th>
+			<td>
+				<textarea id="sheet-tables-links" name="sheet_tables_links" class="large-text code" rows="3"><?php echo esc_textarea( (string) get_post_meta( $post->ID, '_sheet_tables_links', true ) ); ?></textarea>
+				<p class="description"><?php esc_html_e( 'Optional. Make a column\'s text a link: one per line, the column shown, a bar, then the column holding the web address, for example "Title | Public URL". The address column is read for this, but shown only if it is also listed under Columns. Only http and https addresses become links.', 'sheet-tables' ); ?></p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><label for="sheet-tables-row-filter"><?php esc_html_e( 'Show only rows where', 'sheet-tables' ); ?></label></th>
+			<td>
+				<textarea id="sheet-tables-row-filter" name="sheet_tables_row_filter" class="large-text code" rows="3"><?php echo esc_textarea( (string) get_post_meta( $post->ID, '_sheet_tables_row_filter', true ) ); ?></textarea>
+				<p class="description">
+					<?php esc_html_e( 'Optional. One condition per line, "Column = value" or "Column != value", for example "Include? = Yes". A row is shown only if every condition holds; letter case is ignored. The column does not need to be listed under Columns.', 'sheet-tables' ); ?>
+					<strong><?php esc_html_e( 'Other rows are dropped as soon as the sheet is read. If a condition\'s column disappears from the sheet, the last good copy keeps showing rather than every row.', 'sheet-tables' ); ?></strong>
 				</p>
 			</td>
 		</tr>
@@ -421,7 +522,9 @@ function sheet_tables_save_settings( $post_id ) {
 function sheet_tables_source_signature( $post_id ) {
 	$settings = sheet_tables_get_settings( $post_id );
 
-	return wp_json_encode( array( $settings['url'], $settings['access'] ) );
+	// The row filter's column is never stored, so a stored copy cannot be
+	// re-filtered: a new filter needs a fresh read.
+	return wp_json_encode( array( $settings['url'], $settings['access'], $settings['row_filter'] ) );
 }
 
 /**

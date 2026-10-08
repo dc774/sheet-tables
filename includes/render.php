@@ -143,7 +143,7 @@ function sheet_tables_render( $post_id ) {
 	}
 
 	$settings = sheet_tables_get_settings( $post_id );
-	$columns  = sheet_tables_used_columns( sheet_tables_column_names( $settings ), $data['header'], $data['rows'] );
+	$columns  = sheet_tables_used_columns( sheet_tables_display_columns( $settings ), $data['header'], $data['rows'] );
 
 	if ( ! $columns ) {
 		return sheet_tables_editor_note( __( 'None of the chosen columns hold any values.', 'sheet-tables' ) );
@@ -177,7 +177,7 @@ function sheet_tables_render( $post_id ) {
 				<?php foreach ( $data['rows'] as $row ) : ?>
 					<tr>
 						<?php foreach ( $columns as $name ) : ?>
-							<td data-label="<?php echo esc_attr( $settings['columns'][ $name ] ); ?>"><?php echo nl2br( esc_html( $row[ $name ] ?? '' ) ); ?></td>
+							<td data-label="<?php echo esc_attr( $settings['columns'][ $name ] ); ?>"><?php echo sheet_tables_cell_html( $row, $name, $settings ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in sheet_tables_cell_html(). ?></td>
 						<?php endforeach; ?>
 					</tr>
 				<?php endforeach; ?>
@@ -188,6 +188,30 @@ function sheet_tables_render( $post_id ) {
 	<?php
 
 	return ob_get_clean();
+}
+
+/**
+ * One cell's contents: escaped text, linked when the table says so.
+ *
+ * The address comes from the sheet, so only http and https are allowed;
+ * anything else, a javascript: address included, leaves plain text.
+ *
+ * @param array  $row      Stored row.
+ * @param string $name     Source column name.
+ * @param array  $settings From sheet_tables_get_settings().
+ * @return string Escaped HTML.
+ */
+function sheet_tables_cell_html( $row, $name, $settings ) {
+	$text = (string) ( $row[ $name ] ?? '' );
+	$html = nl2br( esc_html( $text ) );
+
+	if ( '' === $text || ! isset( $settings['links'][ $name ] ) ) {
+		return $html;
+	}
+
+	$href = esc_url( (string) ( $row[ (string) $settings['links'][ $name ] ] ?? '' ), array( 'http', 'https' ) );
+
+	return '' === $href ? $html : '<a href="' . $href . '">' . $html . '</a>';
 }
 
 /**

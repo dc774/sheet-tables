@@ -28,8 +28,14 @@ all defined once in `sheet_tables_meta_fields()`; registration, saving and the
 defaults all read that list. `sheet_tables_get_settings()` returns them parsed.
 
 The columns setting is one line per source column, with an optional display
-heading after a bar (`Room | Location`). The keys of the parsed array are the
-whitelist.
+heading after a bar (`Room | Location`). The links setting uses the same
+format: the column shown, then the column holding its URL (`Title | Public
+URL`). The whitelist (`sheet_tables_column_names()`) is the columns shown plus
+those URL columns; `sheet_tables_display_columns()` is only the columns shown.
+
+The row filter setting is one condition per line, `Column = value` or
+`Column != value`, parsed by `sheet_tables_parse_row_filter()`. A line it
+cannot read is kept with a null operator so the read can refuse it.
 
 ## Reading a sheet
 
@@ -47,6 +53,11 @@ whitelist.
        `sheet_tables_csv_url()`. A non-200, an HTML response, or a CSV with no
        findable header is an error.
      - `service_account`: `sheet_tables_google_read()` (see below).
+   - `sheet_tables_filter_rows()` drops rows that fail the row filter. It runs
+     on the full parsed sheet, so it can test a column that is not shown (an
+     `Include?` column, say). It fails closed: an unreadable condition, or one
+     naming a column the header no longer has, is an error, so the last good
+     copy keeps serving instead of every row.
    - `sheet_tables_project()` applies the whitelist. **This is the only place
      unchosen columns are removed, and it runs before anything is stored.**
    - If none of the chosen columns are in the header, that is an error too,
@@ -77,7 +88,9 @@ box, which prints the header row and discards the rest.
   title, then reads its formatted values. A 403 becomes a fault naming the
   email to share the sheet with.
 - Changing a table's access mode counts as a new source: its last good copy
-  and fault are dropped (`sheet_tables_source_signature()`).
+  and fault are dropped (`sheet_tables_source_signature()`, which also covers
+  the URL and the row filter; a stored copy cannot be re-filtered because the
+  filter's column is not stored).
 
 ## What is stored
 
@@ -114,6 +127,9 @@ editor preview is `ServerSideRender`, so there is one markup.
 - Columns that are empty in every row are left out.
 - Every cell is `esc_html()`, then `nl2br()` for multi-line cells. Never
   `wp_kses_post()`: sheet editors are not site editors.
+- `sheet_tables_cell_html()` wraps a linked column's text in `<a>` when its
+  URL column holds an http or https address (`esc_url()` with only those
+  protocols); anything else, `javascript:` included, stays plain text.
 - Each cell carries `data-label`, used by the narrow-screen stacked layout.
 - The table sits in a scroll box (`role="region"`, `tabindex="0"`, named by
   the caption or the table's title) so a wide table can be scrolled from the

@@ -20,6 +20,8 @@ It was built for sheets that are shared working documents, with columns the publ
 
 **Private sheets stay private.** A table can read a sheet that is shared with nobody but your site's Google service account, so the sheet's working columns are not visible to anyone who comes across its link.
 
+**Only the rows you choose, too.** A table can show only the rows that meet conditions such as `Include? = Yes`. The other rows are dropped as soon as the sheet is read, just like unchosen columns, and the column being tested does not have to be shown. If that column is renamed or deleted, the table keeps its last good copy rather than showing every row.
+
 **A broken sheet does not break your page.** If the sheet cannot be read, because someone renamed a header, unpublished the sheet or emptied it, visitors keep seeing the last good copy. The table's edit screen and Tools > Sheet Tables say what went wrong and since when.
 
 **Accessible and light.**
@@ -36,6 +38,7 @@ It was built for sheets that are shared working documents, with columns the publ
 
 * Any number of tables, each with its own sheet, columns, headings and refresh interval.
 * Rename any column's heading for display.
+* Turn a column's text into a link using a web address from another column, such as a title linking to its file.
 * Finds the header row even when the sheet has title or instruction rows above it.
 * A block and a shortcode, `[sheet_table id="123"]`.
 * No account, no premium version, no tracking.

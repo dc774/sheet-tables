@@ -102,6 +102,14 @@ function sheet_tables_download( $settings ) {
 		return $parsed;
 	}
 
+	// Rows, then columns: the filter may test a column that is not chosen,
+	// such as an "Include?" column, so it runs while every column is present.
+	$parsed = sheet_tables_filter_rows( $parsed, $settings['row_filter'] );
+
+	if ( is_wp_error( $parsed ) ) {
+		return $parsed;
+	}
+
 	// The whitelist. Before set_transient() and update_option(), so whatever
 	// is dropped here is never written anywhere.
 	$data = sheet_tables_project( $parsed, sheet_tables_column_names( $settings ) );
@@ -299,6 +307,62 @@ function sheet_tables_parse_rows( $all, $markers = array() ) {
 		'header' => $header,
 		'rows'   => $rows,
 	);
+}
+
+/**
+ * Keep only the rows that meet every row filter condition.
+ *
+ * Fails closed: a condition that cannot be read, or that names a column the
+ * sheet no longer has, is an error, so the last good copy keeps serving. A
+ * renamed or deleted filter column must never publish every row.
+ *
+ * @param array $parsed     Header and rows, all columns included.
+ * @param array $conditions From sheet_tables_parse_row_filter().
+ * @return array{header: string[], rows: array[]}|WP_Error
+ */
+function sheet_tables_filter_rows( $parsed, $conditions ) {
+	foreach ( $conditions as $condition ) {
+		if ( null === $condition['op'] ) {
+			/* translators: %s: the row filter line as entered. */
+			return new WP_Error( 'sheet_tables_bad_filter', sprintf( __( 'This row filter line is not understood: "%s". Use "Column = value" or "Column != value".', 'sheet-tables' ), $condition['line'] ) );
+		}
+
+		if ( ! in_array( $condition['column'], $parsed['header'], true ) ) {
+			/* translators: %s: column name. */
+			return new WP_Error( 'sheet_tables_filter_column', sprintf( __( 'The row filter\'s column "%s" is not in the sheet\'s header row.', 'sheet-tables' ), $condition['column'] ) );
+		}
+	}
+
+	$parsed['rows'] = array_values(
+		array_filter(
+			$parsed['rows'],
+			function ( $row ) use ( $conditions ) {
+				foreach ( $conditions as $condition ) {
+					$equal = sheet_tables_fold( $row[ $condition['column'] ] ?? '' ) === sheet_tables_fold( $condition['value'] );
+
+					if ( ( '=' === $condition['op'] ) !== $equal ) {
+						return false;
+					}
+				}
+
+				return true;
+			}
+		)
+	);
+
+	return $parsed;
+}
+
+/**
+ * Text for a case-insensitive comparison.
+ *
+ * @param string $text Text.
+ * @return string
+ */
+function sheet_tables_fold( $text ) {
+	$text = trim( (string) $text );
+
+	return function_exists( 'mb_strtolower' ) ? mb_strtolower( $text, 'UTF-8' ) : strtolower( $text );
 }
 
 /**
