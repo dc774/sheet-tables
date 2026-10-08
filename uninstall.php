@@ -34,6 +34,16 @@ function sheet_tables_uninstall_site() {
 	}
 
 	delete_option( 'sheet_tables_faults' );
+
+	// The token is keyed by the account, so it is found from the key before
+	// the key itself goes. A key set in wp-config.php is the owner's to remove.
+	$email = sheet_tables_google_email();
+
+	if ( '' !== $email ) {
+		delete_transient( sheet_tables_google_token_key( $email ) );
+	}
+
+	delete_option( SHEET_TABLES_CREDENTIALS_OPTION );
 }
 
 if ( is_multisite() ) {

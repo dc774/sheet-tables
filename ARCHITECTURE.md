@@ -12,6 +12,8 @@ uninstall.php             Deletes every table and its stored copies.
 includes/post-type.php    The sheet_table post type.
 includes/settings.php     Meta fields, the settings box, the save handler.
 includes/fetch.php        Read, parse, whitelist, cache, fall back, faults.
+includes/google.php       Service account: key, access token, Sheets API read,
+                          Settings > Sheet Tables.
 includes/render.php       Shortcode, block registration, table markup, assets.
 includes/status.php       Tools > Sheet Tables.
 block/                    block.json, the editor script, its asset file.
@@ -36,11 +38,15 @@ whitelist.
 1. No URL or no columns: return an error without requesting anything.
 2. Cached copy in the transient: return it.
 3. Otherwise `sheet_tables_download()`:
-   - `sheet_tables_read_sheet()` requests the URL with `wp_safe_remote_get`
-     plus a `cachebust` parameter (Google serves stale copies otherwise). A
-     Google Sheets editor link is rewritten to its CSV export URL by
-     `sheet_tables_csv_url()`. A non-200, an HTML response, or a CSV with no
-     findable header is an error.
+   - `sheet_tables_read_sheet()` reads the sheet one of two ways, by the
+     table's `access` setting, and both end in `sheet_tables_parse_rows()`
+     (header detection by marker cells, rows keyed by header):
+     - `link`: requests the URL with `wp_safe_remote_get` plus a `cachebust`
+       parameter (Google serves stale copies otherwise). A Google Sheets
+       editor link is rewritten to its CSV export URL by
+       `sheet_tables_csv_url()`. A non-200, an HTML response, or a CSV with no
+       findable header is an error.
+     - `service_account`: `sheet_tables_google_read()` (see below).
    - `sheet_tables_project()` applies the whitelist. **This is the only place
      unchosen columns are removed, and it runs before anything is stored.**
    - If none of the chosen columns are in the header, that is an error too,
@@ -54,6 +60,25 @@ whitelist.
 it: `sheet_tables_download()`, which whitelists immediately, and the settings
 box, which prints the header row and discards the rest.
 
+## Private sheets (`includes/google.php`)
+
+- The key is `SHEET_TABLES_GOOGLE_CREDENTIALS` (wp-config.php, JSON string)
+  if defined, else the option `sheet_tables_google_credentials`, saved from
+  Settings > Sheet Tables (`manage_options`, nonce, `admin-post.php`). Either
+  way `sheet_tables_google_parse_key()` reduces it to `client_email`,
+  `private_key` and `token_uri`, and rejects anything that is not a service
+  account key whose private key OpenSSL can read. The page never prints the
+  key back.
+- `sheet_tables_google_token()` signs a JWT (RS256 with `openssl_sign`, no
+  library) for the read-only Sheets scope, posts it to the key's `token_uri`,
+  and caches only the returned access token, keyed by the account's email.
+- `sheet_tables_google_read()` takes the sheet ID and gid from the pasted link
+  (`sheet_tables_google_ref()`, shared with the CSV path), looks up the tab's
+  title, then reads its formatted values. A 403 becomes a fault naming the
+  email to share the sheet with.
+- Changing a table's access mode counts as a new source: its last good copy
+  and fault are dropped (`sheet_tables_source_signature()`).
+
 ## What is stored
 
 | Where | Key | Holds |
@@ -62,6 +87,8 @@ box, which prints the header row and discards the rest.
 | Option (not autoloaded) | `sheet_tables_last_good_{ID}` | Last successful copy, chosen columns only |
 | Option (not autoloaded) | `sheet_tables_faults` | Post ID => first failure message and time |
 | Post meta | `_sheet_tables_*` | The table's settings |
+| Option (not autoloaded) | `sheet_tables_google_credentials` | Service account email, private key, token URI (unless set in wp-config.php) |
+| Transient | `sheet_tables_google_token_{md5(email)}` | Short-lived Sheets API access token |
 
 Stored copies are `{ header: string[], rows: array[], fetched: int }`. Rows
 keep only non-empty chosen cells.
@@ -73,7 +100,8 @@ Keeping them honest:
   copy, so removing a column removes its stored values too.
 - Deleting a table (`before_delete_post`) removes all three.
 - Uninstall deletes every table, which runs the same cleanup, then the fault
-  option. On multisite it does this on every site.
+  option, the access token and the stored key (a key in wp-config.php is the
+  owner's to remove). On multisite it does this on every site.
 
 ## Showing a table
 
@@ -116,5 +144,6 @@ sheet, and any fault. A table's own edit screen shows its fault too.
 ## Rules
 
 - Prefix `sheet_tables_` / `SHEET_TABLES_`. No `cwd_`, no ACF.
-- No external CDN, no telemetry. The only outbound request is to a URL an
-  editor entered.
+- No external CDN, no telemetry. Outbound requests go only to a URL an
+  editor entered, or, for private sheets, to the token address in the
+  administrator's key and the Google Sheets API.

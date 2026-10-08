@@ -27,6 +27,11 @@ function sheet_tables_meta_fields() {
 			'default'  => '',
 			'sanitize' => 'sheet_tables_sanitize_url',
 		),
+		'_sheet_tables_access'        => array(
+			'type'     => 'string',
+			'default'  => 'link',
+			'sanitize' => 'sheet_tables_sanitize_access',
+		),
 		'_sheet_tables_columns'       => array(
 			'type'     => 'string',
 			'default'  => '',
@@ -96,6 +101,16 @@ function sheet_tables_sanitize_url( $url ) {
 }
 
 /**
+ * How a table reads its sheet: by link, or through the site's service account.
+ *
+ * @param mixed $access Raw value.
+ * @return string
+ */
+function sheet_tables_sanitize_access( $access ) {
+	return 'service_account' === $access ? 'service_account' : 'link';
+}
+
+/**
  * Cache duration in whole minutes, at least one.
  *
  * @param mixed $minutes Raw value.
@@ -135,13 +150,14 @@ function sheet_tables_parse_columns( $text ) {
  * A table's settings, parsed and ready to use.
  *
  * @param int $post_id Table post ID.
- * @return array{url: string, columns: array<string, string>, markers: string[], cache_minutes: int, caption: string, sort: bool, search: bool}
+ * @return array{url: string, access: string, columns: array<string, string>, markers: string[], cache_minutes: int, caption: string, sort: bool, search: bool}
  */
 function sheet_tables_get_settings( $post_id ) {
 	$markers = explode( ',', (string) get_post_meta( $post_id, '_sheet_tables_markers', true ) );
 
 	return array(
 		'url'           => (string) get_post_meta( $post_id, '_sheet_tables_url', true ),
+		'access'        => sheet_tables_sanitize_access( get_post_meta( $post_id, '_sheet_tables_access', true ) ),
 		'columns'       => sheet_tables_parse_columns( get_post_meta( $post_id, '_sheet_tables_columns', true ) ),
 		'markers'       => array_values( array_filter( array_map( 'trim', $markers ), 'strlen' ) ),
 		'cache_minutes' => sheet_tables_sanitize_minutes( get_post_meta( $post_id, '_sheet_tables_cache_minutes', true ) ),
@@ -220,10 +236,21 @@ function sheet_tables_render_meta_box( $post ) {
 			</td>
 		</tr>
 		<tr>
-			<th scope="row"><label for="sheet-tables-url"><?php esc_html_e( 'Sheet CSV URL', 'sheet-tables' ); ?></label></th>
+			<th scope="row"><label for="sheet-tables-url"><?php esc_html_e( 'Sheet URL', 'sheet-tables' ); ?></label></th>
 			<td>
 				<input type="url" id="sheet-tables-url" name="sheet_tables_url" class="large-text code" value="<?php echo esc_attr( $settings['url'] ); ?>" placeholder="https://">
-				<p class="description"><?php esc_html_e( 'Paste the Google Sheets link for the tab you want, as long as the sheet is shared so that anyone with the link can view it. A "Publish to web" link in CSV format, or any other https link to a CSV file, also works.', 'sheet-tables' ); ?></p>
+				<p class="description"><?php esc_html_e( 'Paste the Google Sheets link for the tab you want. A "Publish to web" link in CSV format, or any other https link to a CSV file, also works when the sheet is read by link.', 'sheet-tables' ); ?></p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Sheet access', 'sheet-tables' ); ?></th>
+			<td>
+				<fieldset>
+					<legend class="screen-reader-text"><?php esc_html_e( 'Sheet access', 'sheet-tables' ); ?></legend>
+					<label><input type="radio" name="sheet_tables_access" value="link" <?php checked( 'link', $settings['access'] ); ?>> <?php esc_html_e( 'Shared by link: anyone with the link can view the sheet', 'sheet-tables' ); ?></label><br>
+					<label><input type="radio" name="sheet_tables_access" value="service_account" <?php checked( 'service_account', $settings['access'] ); ?>> <?php esc_html_e( 'Private: read through this site\'s Google service account', 'sheet-tables' ); ?></label>
+				</fieldset>
+				<p class="description"><?php sheet_tables_render_access_help(); ?></p>
 			</td>
 		</tr>
 		<tr>
@@ -268,6 +295,32 @@ function sheet_tables_render_meta_box( $post ) {
 		</tr>
 	</table>
 	<?php
+}
+
+/**
+ * Say who a private sheet must be shared with, or where to set that up.
+ */
+function sheet_tables_render_access_help() {
+	$email = sheet_tables_google_email();
+
+	if ( '' !== $email ) {
+		printf(
+			/* translators: %s: service account email address. */
+			esc_html__( 'For a private sheet, share it with %s as a Viewer.', 'sheet-tables' ),
+			'<code>' . esc_html( $email ) . '</code>'
+		);
+		return;
+	}
+
+	esc_html_e( 'Private sheets need a Google service account, which is not set up yet.', 'sheet-tables' );
+
+	if ( current_user_can( 'manage_options' ) ) {
+		printf(
+			' <a href="%s">%s</a>',
+			esc_url( admin_url( 'options-general.php?page=sheet-tables-settings' ) ),
+			esc_html__( 'Set one up', 'sheet-tables' )
+		);
+	}
 }
 
 /**
@@ -331,7 +384,7 @@ function sheet_tables_save_settings( $post_id ) {
 		return;
 	}
 
-	$old_url = (string) get_post_meta( $post_id, '_sheet_tables_url', true );
+	$old_source = sheet_tables_source_signature( $post_id );
 
 	foreach ( sheet_tables_meta_fields() as $key => $field ) {
 		$name = ltrim( $key, '_' );
@@ -353,7 +406,22 @@ function sheet_tables_save_settings( $post_id ) {
 		update_post_meta( $post_id, $key, $value );
 	}
 
-	sheet_tables_settings_changed( $post_id, (string) get_post_meta( $post_id, '_sheet_tables_url', true ) !== $old_url );
+	sheet_tables_settings_changed( $post_id, sheet_tables_source_signature( $post_id ) !== $old_source );
+}
+
+/**
+ * The settings that decide which rows are read, as one comparable value.
+ *
+ * When any of them changes, the last good copy no longer describes the
+ * table and must not be served.
+ *
+ * @param int $post_id Table post ID.
+ * @return string
+ */
+function sheet_tables_source_signature( $post_id ) {
+	$settings = sheet_tables_get_settings( $post_id );
+
+	return wp_json_encode( array( $settings['url'], $settings['access'] ) );
 }
 
 /**

@@ -119,6 +119,23 @@ function sheet_tables_download( $settings ) {
 }
 
 /**
+ * The sheet ID and tab named by a Google Sheets editor link.
+ *
+ * @param string $url URL as stored.
+ * @return array{id: string, gid: string|null}|null Null if it is not such a link.
+ */
+function sheet_tables_google_ref( $url ) {
+	if ( ! preg_match( '#^https://docs\.google\.com/spreadsheets/d/([A-Za-z0-9_-]+)/?(?:edit|view)?(?:[?\#].*)?$#', $url, $sheet ) ) {
+		return null;
+	}
+
+	return array(
+		'id'  => $sheet[1],
+		'gid' => preg_match( '/[?&#]gid=(\d+)/', $url, $tab ) ? $tab[1] : null,
+	);
+}
+
+/**
  * The URL to request for a sheet, given the URL an editor pasted.
  *
  * People paste the link from the address bar or the Share button, which is
@@ -130,14 +147,16 @@ function sheet_tables_download( $settings ) {
  * @return string
  */
 function sheet_tables_csv_url( $url ) {
-	if ( ! preg_match( '#^https://docs\.google\.com/spreadsheets/d/([A-Za-z0-9_-]+)/?(?:edit|view)?(?:[?\#].*)?$#', $url, $sheet ) ) {
+	$ref = sheet_tables_google_ref( $url );
+
+	if ( ! $ref ) {
 		return $url;
 	}
 
-	$export = 'https://docs.google.com/spreadsheets/d/' . $sheet[1] . '/export?format=csv';
+	$export = 'https://docs.google.com/spreadsheets/d/' . $ref['id'] . '/export?format=csv';
 
-	if ( preg_match( '/[?&#]gid=(\d+)/', $url, $tab ) ) {
-		$export .= '&gid=' . $tab[1];
+	if ( null !== $ref['gid'] ) {
+		$export .= '&gid=' . $ref['gid'];
 	}
 
 	return $export;
@@ -154,6 +173,12 @@ function sheet_tables_csv_url( $url ) {
  * @return array{header: string[], rows: array[]}|WP_Error
  */
 function sheet_tables_read_sheet( $settings ) {
+	if ( 'service_account' === $settings['access'] ) {
+		$rows = sheet_tables_google_read( $settings['url'] );
+
+		return is_wp_error( $rows ) ? $rows : sheet_tables_parse_rows( $rows, $settings['markers'] );
+	}
+
 	// Google will serve a long-stale copy of an export URL: the plain URL has
 	// been seen returning a version of a tab that had since been emptied,
 	// while the same URL with an unused parameter returned the current one. A
@@ -215,6 +240,20 @@ function sheet_tables_parse_csv( $csv, $markers = array() ) {
 	}
 	fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 
+	return sheet_tables_parse_rows( $all, $markers );
+}
+
+/**
+ * Turn rows of cells into a header row plus data rows keyed by header.
+ *
+ * Shared by both ways of reading a sheet. With markers the header is located
+ * by content; without them the first non-empty row is the header.
+ *
+ * @param string[][] $all     Every row, as lists of trimmed cells.
+ * @param string[]   $markers Header cells that identify the header row.
+ * @return array{header: string[], rows: array[]}|WP_Error
+ */
+function sheet_tables_parse_rows( $all, $markers = array() ) {
 	$header       = array();
 	$header_index = null;
 
@@ -403,18 +442,19 @@ function sheet_tables_clear_fault( $post_id ) {
  * Bring stored copies in line with a table's new settings.
  *
  * The cache is always dropped so the next view reads the sheet again. A new
- * URL makes the last good copy and any fault meaningless, so both go. With the
- * same URL the last good copy is kept as a fallback, but trimmed to the
- * columns now chosen: removing a column from the list must remove its values
- * from the database too, not just from the page.
+ * source (see sheet_tables_source_signature()) makes the last good copy and
+ * any fault meaningless, so both go. With the same source the last good copy
+ * is kept as a fallback, but trimmed to the columns now chosen: removing a
+ * column from the list must remove its values from the database too, not
+ * just from the page.
  *
- * @param int  $post_id     Table post ID.
- * @param bool $url_changed Whether the sheet URL changed.
+ * @param int  $post_id        Table post ID.
+ * @param bool $source_changed Whether the settings deciding which rows are read changed.
  */
-function sheet_tables_settings_changed( $post_id, $url_changed ) {
+function sheet_tables_settings_changed( $post_id, $source_changed ) {
 	delete_transient( sheet_tables_cache_key( $post_id ) );
 
-	if ( $url_changed ) {
+	if ( $source_changed ) {
 		delete_option( sheet_tables_last_good_key( $post_id ) );
 		sheet_tables_clear_fault( $post_id );
 		return;

@@ -18,6 +18,8 @@ It was built for sheets that are shared working documents, with columns the publ
 
 **Only the columns you choose ever reach your site.** You list the columns a table shows. Every other column is dropped the moment the sheet is read, before anything is cached or saved. It never reaches your database, your cache or your pages, so a column of private notes in the same sheet cannot leak through a template change, a cache or a backup.
 
+**Private sheets stay private.** A table can read a sheet that is shared with nobody but your site's Google service account, so the sheet's working columns are not visible to anyone who comes across its link.
+
 **A broken sheet does not break your page.** If the sheet cannot be read, because someone renamed a header, unpublished the sheet or emptied it, visitors keep seeing the last good copy. The table's edit screen and Tools > Sheet Tables say what went wrong and since when.
 
 **Accessible and light.**
@@ -41,8 +43,8 @@ It was built for sheets that are shared working documents, with columns the publ
 == Installation ==
 
 1. Install and activate the plugin.
-2. In Google Sheets, share the sheet so that anyone with the link can view it, or use File > Share > Publish to web.
-3. Go to Sheet Tables > Add New. Paste the sheet's link, then list the columns to show, one per line. Once the link is saved, the edit screen lists the sheet's columns so you can copy their exact names.
+2. In Google Sheets, either share the sheet so that anyone with the link can view it, or keep it private and set up a service account (see the FAQ).
+3. Go to Sheet Tables > Add New. Paste the sheet's link, choose how the sheet is accessed, then list the columns to show, one per line. Once the link is saved, the edit screen lists the sheet's columns so you can copy their exact names.
 4. Publish the table, then add it to any page with the Sheet Table block or its shortcode.
 
 == Frequently Asked Questions ==
@@ -53,7 +55,26 @@ Each table keeps a copy of its sheet for the number of minutes set in its "Refre
 
 = Does the sheet have to be public? =
 
-It has to be readable without signing in: either shared so that anyone with the link can view it, or published to the web. Only the columns you choose are ever shown on your site, but anyone who has the sheet's link can open the whole sheet in Google, so keep the link to yourself.
+No. A table can read a sheet in one of two ways, chosen per table:
+
+* **Shared by link.** The sheet is shared so that anyone with the link can view it, or published to the web. Nothing else to set up, but anyone who has the link can open the whole sheet in Google, so keep the link to yourself.
+* **Private.** The sheet is shared only with your site's Google service account. Nobody without access in Google can open it.
+
+Either way, only the columns you choose are ever stored or shown on your site.
+
+= How do I set up a service account for private sheets? =
+
+Once per site:
+
+1. In the Google Cloud console (console.cloud.google.com), create a project, or pick an existing one.
+2. Under APIs & Services, enable the **Google Sheets API**.
+3. Under IAM & Admin > Service Accounts, create a service account. It needs no roles.
+4. Open the service account, go to Keys, and add a key of type JSON. A file downloads.
+5. Either paste the whole file into Settings > Sheet Tables, or, to keep the key out of the database, add it to wp-config.php: `define( 'SHEET_TABLES_GOOGLE_CREDENTIALS', '...contents of the file...' );`
+
+Then, for each private sheet, open Share in Google Sheets and add the service account's email address (shown on Settings > Sheet Tables and on each table's edit screen) as a Viewer. Set the table's Sheet access to Private.
+
+The key lets anyone who holds it read every sheet shared with that service account, so treat the file like a password and delete the downloaded copy once it is in place. If your organization's Google Workspace blocks sharing with addresses outside it, ask its administrator to allow the service account.
 
 = Can I use something other than Google Sheets? =
 
@@ -71,9 +92,12 @@ Only the columns you chose: the current copy (as a transient) and the last good 
 
 == External services ==
 
-This plugin reads spreadsheets from the address you enter for each table, which is normally Google Sheets (docs.google.com). Reading the sheet is how the table gets its data.
+This plugin reads spreadsheets from the address you enter for each table, which is normally Google Sheets. Reading the sheet is how the table gets its data.
 
-The site's server requests that address when a table is shown and its stored copy has expired, and when the table's edit screen is opened, to list the sheet's columns. The request is an ordinary download of the sheet as CSV. No information about your visitors or your users is sent.
+The site's server reads the sheet when a table is shown and its stored copy has expired, and when the table's edit screen is opened, to list the sheet's columns. No information about your visitors or your users is sent.
+
+* A table whose sheet is **shared by link** downloads it as CSV from the address entered (normally docs.google.com).
+* A table whose sheet is **private** uses the service account set up under Settings > Sheet Tables. The site sends a request signed with the service account's key to Google's token service (oauth2.googleapis.com, or the token address in the key) to get a short-lived access token, then reads the sheet from the Google Sheets API (sheets.googleapis.com). The key itself is never sent.
 
 Google Sheets is provided by Google: [Terms of Service](https://policies.google.com/terms), [Privacy Policy](https://policies.google.com/privacy).
 

@@ -26,5 +26,6 @@ define( 'SHEET_TABLES_POST_TYPE', 'sheet_table' );
 require_once SHEET_TABLES_DIR . 'includes/post-type.php';
 require_once SHEET_TABLES_DIR . 'includes/settings.php';
 require_once SHEET_TABLES_DIR . 'includes/fetch.php';
+require_once SHEET_TABLES_DIR . 'includes/google.php';
 require_once SHEET_TABLES_DIR . 'includes/render.php';
 require_once SHEET_TABLES_DIR . 'includes/status.php';
