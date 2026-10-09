@@ -339,6 +339,33 @@ function sheet_tables_render_meta_box( $post ) {
 				<p class="description"><?php esc_html_e( 'Paste this into any post or page to show the table there.', 'sheet-tables' ); ?></p>
 			</td>
 		</tr>
+		<?php if ( '' !== $settings['url'] && $settings['columns'] && 'auto-draft' !== $post->post_status ) : ?>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Sheet data', 'sheet-tables' ); ?></th>
+				<td>
+					<?php
+					$last_good = get_option( sheet_tables_last_good_key( $post->ID ) );
+
+					if ( is_array( $last_good ) ) {
+						printf(
+							'<p>%s</p>',
+							esc_html(
+								sprintf(
+									/* translators: 1: date and time, 2: number of rows. */
+									_n( 'Last read %1$s: %2$s row.', 'Last read %1$s: %2$s rows.', count( $last_good['rows'] ), 'sheet-tables' ),
+									sheet_tables_format_time( $last_good['fetched'] ),
+									number_format_i18n( count( $last_good['rows'] ) )
+								)
+							)
+						);
+					}
+
+					echo sheet_tables_refresh_link( $post->ID, 'edit' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in sheet_tables_refresh_link().
+					?>
+					<p class="description"><?php esc_html_e( 'Reads the sheet now instead of waiting for the refresh interval. Save any changes to the settings first. Pages your host has cached may take a few minutes longer to change.', 'sheet-tables' ); ?></p>
+				</td>
+			</tr>
+		<?php endif; ?>
 		<tr>
 			<th scope="row"><label for="sheet-tables-url"><?php esc_html_e( 'Sheet URL', 'sheet-tables' ); ?></label></th>
 			<td>

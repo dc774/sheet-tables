@@ -4,7 +4,8 @@
  *
  * Reads only what is already stored. It never requests a sheet, so opening it
  * costs nothing however many tables there are, and it cannot itself be slowed
- * down by the problem it is reporting.
+ * down by the problem it is reporting. A sheet is read only when someone
+ * presses a table's "Pull fresh data" button.
  *
  * @package SheetTables
  */
@@ -84,6 +85,7 @@ function sheet_tables_status_report() {
 
 		$report[] = array(
 			'post'    => $table,
+			'ready'   => '' !== $settings['url'] && $settings['columns'],
 			'state'   => $state,
 			'fault'   => $fault,
 			'fetched' => $last_good['fetched'] ?? 0,
@@ -129,6 +131,9 @@ function sheet_tables_status_page() {
 							<td>
 								<a href="<?php echo esc_url( get_edit_post_link( $line['post']->ID ) ); ?>"><?php echo esc_html( get_the_title( $line['post'] ) ); ?></a>
 								<br><code><?php echo esc_html( '[sheet_table id="' . $line['post']->ID . '"]' ); ?></code>
+								<?php if ( $line['ready'] && current_user_can( 'edit_post', $line['post']->ID ) ) : ?>
+									<br><?php echo sheet_tables_refresh_link( $line['post']->ID, 'status' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in sheet_tables_refresh_link(). ?>
+								<?php endif; ?>
 							</td>
 							<td><?php echo esc_html( $line['state'] ); ?></td>
 							<td><?php echo $line['fetched'] ? esc_html( sheet_tables_format_time( $line['fetched'] ) ) : '&ndash;'; ?></td>
@@ -157,3 +162,130 @@ function sheet_tables_status_page() {
 	</div>
 	<?php
 }
+
+add_action( 'admin_post_sheet_tables_refresh', 'sheet_tables_refresh' );
+add_action( 'admin_notices', 'sheet_tables_refresh_notice' );
+
+/**
+ * Link that drops a table's copy and reads its sheet again.
+ *
+ * A link rather than a form, because on the edit screen it sits inside the
+ * post's own form. The nonce is tied to the table.
+ *
+ * @param int    $post_id Table post ID.
+ * @param string $back    Where to return: "edit" or "status".
+ * @return string
+ */
+function sheet_tables_refresh_link( $post_id, $back ) {
+	$url = wp_nonce_url(
+		add_query_arg(
+			array(
+				'action' => 'sheet_tables_refresh',
+				'table'  => (int) $post_id,
+				'back'   => 'edit' === $back ? 'edit' : 'status',
+			),
+			admin_url( 'admin-post.php' )
+		),
+		'sheet_tables_refresh_' . (int) $post_id
+	);
+
+	return '<a class="button" href="' . esc_url( $url ) . '">' . esc_html__( 'Pull fresh data', 'sheet-tables' ) . '</a>';
+}
+
+/**
+ * Read a table's sheet now, then return to where the button was.
+ */
+function sheet_tables_refresh() {
+	$post_id = isset( $_GET['table'] ) ? absint( $_GET['table'] ) : 0;
+
+	check_admin_referer( 'sheet_tables_refresh_' . $post_id );
+
+	if ( SHEET_TABLES_POST_TYPE !== get_post_type( $post_id ) || ! current_user_can( 'edit_post', $post_id ) ) {
+		wp_die( esc_html__( 'You are not allowed to refresh this table.', 'sheet-tables' ), 403 );
+	}
+
+	delete_transient( sheet_tables_cache_key( $post_id ) );
+	$data = sheet_tables_fetch( $post_id );
+
+	// A failed read still returns the last good copy, so success is told by
+	// the fault log, which every successful read clears.
+	$faults = sheet_tables_get_faults();
+	$result = ( is_wp_error( $data ) || isset( $faults[ $post_id ] ) ) ? 'failed' : count( $data['rows'] );
+
+	$back     = isset( $_GET['back'] ) && 'edit' === sanitize_key( wp_unslash( $_GET['back'] ) ) ? get_edit_post_link( $post_id, 'raw' ) : admin_url( 'tools.php?page=sheet-tables-status' );
+	$redirect = add_query_arg(
+		array(
+			'sheet_tables_refreshed' => $result,
+			'sheet_tables_table'     => $post_id,
+		),
+		$back
+	);
+
+	wp_safe_redirect( $redirect );
+	exit;
+}
+
+/**
+ * Say how the refresh went, on the screen it returned to.
+ */
+function sheet_tables_refresh_notice() {
+	// Display only: these read flags this plugin set on its own redirect.
+	if ( ! isset( $_GET['sheet_tables_refreshed'], $_GET['sheet_tables_table'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return;
+	}
+
+	$result  = sanitize_key( wp_unslash( $_GET['sheet_tables_refreshed'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	$post_id = absint( $_GET['sheet_tables_table'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+	// The flags can be typed into any admin address, so a title is shown only
+	// for a table the viewer could have refreshed.
+	if ( SHEET_TABLES_POST_TYPE !== get_post_type( $post_id ) || ! current_user_can( 'edit_post', $post_id ) ) {
+		return;
+	}
+
+	$title = get_the_title( $post_id );
+
+	if ( 'failed' === $result ) {
+		$faults = sheet_tables_get_faults();
+		$reason = $faults[ $post_id ]['message'] ?? __( 'The table needs a sheet URL and at least one column.', 'sheet-tables' );
+		?>
+		<div class="notice notice-error is-dismissible">
+			<p>
+				<?php
+				printf(
+					/* translators: 1: table title, 2: why the read failed. */
+					esc_html__( 'Could not read the sheet for "%1$s": %2$s Visitors still see the last good copy, if there is one.', 'sheet-tables' ),
+					esc_html( $title ),
+					esc_html( $reason )
+				);
+				?>
+			</p>
+		</div>
+		<?php
+		return;
+	}
+	?>
+	<div class="notice notice-success is-dismissible">
+		<p>
+			<?php
+			printf(
+				/* translators: 1: number of rows, 2: table title. */
+				esc_html( _n( 'Pulled %1$s row for "%2$s" just now.', 'Pulled %1$s rows for "%2$s" just now.', absint( $result ), 'sheet-tables' ) ),
+				esc_html( number_format_i18n( absint( $result ) ) ),
+				esc_html( $title )
+			);
+			?>
+		</p>
+	</div>
+	<?php
+}
+
+add_filter(
+	'removable_query_args',
+	function ( $args ) {
+		// Cleared from the address bar once shown, so a reload does not repeat it.
+		$args[] = 'sheet_tables_refreshed';
+		$args[] = 'sheet_tables_table';
+		return $args;
+	}
+);

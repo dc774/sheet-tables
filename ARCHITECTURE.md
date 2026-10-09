@@ -170,6 +170,15 @@ Tools > Sheet Tables (`manage_options`) reports, from stored data only, each
 table's state, last good read, row count, chosen columns missing from the
 sheet, and any fault. A table's own edit screen shows its fault too.
 
+"Pull fresh data" (on that screen and in the table's settings box) is a link,
+because the settings box sits inside the post form, to
+`admin-post.php?action=sheet_tables_refresh` with a nonce tied to the table,
+checked with `edit_post`. It drops the transient and calls
+`sheet_tables_fetch()`. A failed read still returns the last good copy, so the
+result is told from the fault log, which every successful read clears. It
+redirects back with `sheet_tables_refreshed` (row count or `failed`), shown as
+a notice and then removed from the address bar.
+
 ## Hooks
 
 - `sheet_tables_cache_ttl` (seconds, post ID): a table's cache lifetime.

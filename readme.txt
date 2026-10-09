@@ -57,7 +57,7 @@ It was built for sheets that are shared working documents, with columns the publ
 
 = I changed the sheet. Why hasn't the site changed? =
 
-Each table keeps a copy of its sheet for the number of minutes set in its "Refresh every" setting, five by default. Updating the table drops the copy, so the next page view reads the sheet again.
+Each table keeps a copy of its sheet for the number of minutes set in its "Refresh every" setting, five by default. To see a change straight away, press **Pull fresh data** on the table's edit screen or on Tools > Sheet Tables. Updating the table also drops the copy, so the next page view reads the sheet again. If your host caches whole pages, the page itself may take a few more minutes to change.
 
 = Does the sheet have to be public? =
 
@@ -114,6 +114,8 @@ Google Sheets is provided by Google: [Terms of Service](https://policies.google.
 * Row filter: show only rows that meet conditions such as "Include? = Yes". Other rows are never stored.
 * Link columns: link a column's text to a web address held in another column.
 * Dropdown filters, paging, and links that open a table already filtered.
+* "Pull fresh data" button on each table's edit screen and on Tools > Sheet Tables.
+* The edit screen says when a Google link names no tab, so the first tab is being read.
 
 = 1.0.0 =
 * First release.
