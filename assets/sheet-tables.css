@@ -1,0 +1,185 @@
+/* Sheet Tables.
+ *
+ * Deliberately light. The theme already styles tables, so this adds only what
+ * a plain table lacks: sideways scrolling when it is too wide, the sort and
+ * filter controls, stacked rows on a phone, and print. No colours are set, so
+ * the table takes the theme's. */
+
+.sheet-tables {
+	margin-block: 1.5em;
+}
+
+.sheet-tables__scroll {
+	overflow-x: auto;
+}
+
+.sheet-tables__table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.sheet-tables__table th,
+.sheet-tables__table td {
+	text-align: start;
+	vertical-align: top;
+}
+
+.sheet-tables__controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75em 1.5em;
+	align-items: flex-end;
+	margin-block-end: 0.5em;
+}
+
+.sheet-tables__control {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25em;
+	max-width: 100%;
+}
+
+.sheet-tables__control select {
+	max-width: 100%;
+}
+
+/* Rows on other pages. Not [hidden], so print can still show them. */
+.sheet-tables__table tr.sheet-tables__paged-out {
+	display: none;
+}
+
+.sheet-tables__pager {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1em;
+	align-items: center;
+	margin-block-start: 0.5em;
+}
+
+.sheet-tables__pager[hidden] {
+	display: none;
+}
+
+.sheet-tables__count {
+	margin-block: 0 0.5em;
+	font-size: 0.9em;
+}
+
+.sheet-tables__count:empty {
+	display: none;
+}
+
+/* The sort button stands in for the heading text, so it looks like it. Two
+ * classes, so a theme's plain `button` rule does not restyle it. */
+.sheet-tables .sheet-tables__sort {
+	display: inline-flex;
+	gap: 0.35em;
+	align-items: center;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: inherit;
+	cursor: pointer;
+}
+
+.sheet-tables .sheet-tables__sort:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: 2px;
+}
+
+/* The arrow is decoration: aria-sort already tells a screen reader the order,
+ * so the second declaration gives the arrow empty alternative text. The first
+ * is the fallback for browsers that do not support that syntax. */
+.sheet-tables .sheet-tables__sort::after {
+	content: "\2195";
+	content: "\2195" / "";
+	opacity: 0.5;
+}
+
+.sheet-tables th[aria-sort="ascending"] .sheet-tables__sort::after {
+	content: "\2191";
+	content: "\2191" / "";
+	opacity: 1;
+}
+
+.sheet-tables th[aria-sort="descending"] .sheet-tables__sort::after {
+	content: "\2193";
+	content: "\2193" / "";
+	opacity: 1;
+}
+
+/* On a narrow screen each row becomes a block of labelled lines. The labels
+ * come from the data-label attribute written on every cell at render time.
+ * The header row is removed rather than visually hidden, so its sort buttons
+ * cannot take keyboard focus while unseen. */
+@media screen and (max-width: 40em) {
+	.sheet-tables__table thead {
+		display: none;
+	}
+
+	.sheet-tables__table,
+	.sheet-tables__table tbody,
+	.sheet-tables__table tr {
+		display: block;
+	}
+
+	.sheet-tables__table tr {
+		padding-block: 0.5em;
+		border-block-end: 1px solid rgba(128, 128, 128, 0.4);
+	}
+
+	/* The display: block above outranks the browser's own [hidden] rule, so
+	 * rows the filter hides have to be hidden again here. */
+	.sheet-tables__table tr[hidden],
+	.sheet-tables__table tr.sheet-tables__paged-out {
+		display: none;
+	}
+
+	.sheet-tables__table td {
+		display: grid;
+		grid-template-columns: minmax(6em, 35%) 1fr;
+		gap: 0.75em;
+		border: 0;
+	}
+
+	.sheet-tables__table td::before {
+		content: attr(data-label);
+		font-weight: 700;
+	}
+
+	.sheet-tables__table td:empty {
+		display: none;
+	}
+}
+
+/* Print carries the whole table: every row, including any the filters hid or
+ * paging set aside, with the header repeated on each page and no scroll box
+ * cutting it off. */
+@media print {
+	.sheet-tables__controls,
+	.sheet-tables__pager,
+	.sheet-tables__count,
+	.sheet-tables .sheet-tables__sort::after {
+		display: none;
+	}
+
+	.sheet-tables__scroll {
+		overflow: visible;
+	}
+
+	.sheet-tables__table thead {
+		display: table-header-group;
+	}
+
+	.sheet-tables__table tr {
+		break-inside: avoid;
+	}
+
+	.sheet-tables__table tr[hidden],
+	.sheet-tables__table tr.sheet-tables__paged-out {
+		display: table-row !important;
+	}
+}
