@@ -92,6 +92,10 @@ If it was one of your chosen columns, the table carries on without it and Tools 
 
 To make a column required, list it under "Header row" too. The header row is then only recognized when that column is present, so renaming it keeps the last good copy on the page instead.
 
+= I can't find the Sheet Table block in the editor =
+
+Some themes limit the editor to an approved list of blocks. If yours does, add `sheet-tables/table` to that list to use the Sheet Table block, or ask whoever maintains the theme to add it. In the meantime the shortcode works in any paragraph: type `[sheet_table id="123"]`, using the id shown on the table's edit screen.
+
 = Is anything from the sheet stored in my database? =
 
 Only the columns you chose: the current copy (as a transient) and the last good copy (as an option), both removed when the table or the plugin is deleted.
