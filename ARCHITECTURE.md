@@ -37,6 +37,10 @@ The row filter setting is one condition per line, `Column = value` or
 `Column != value`, parsed by `sheet_tables_parse_row_filter()`. A line it
 cannot read is kept with a null operator so the read can refuse it.
 
+A Google link with no `gid` reads the sheet's first tab. The Share button's
+"Copy link" gives such a link, so the settings box says so whenever the saved
+link names no tab.
+
 ## Reading a sheet
 
 `sheet_tables_fetch( $post_id )` is the single entry point.

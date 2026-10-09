@@ -344,6 +344,17 @@ function sheet_tables_render_meta_box( $post ) {
 			<td>
 				<input type="url" id="sheet-tables-url" name="sheet_tables_url" class="large-text code" value="<?php echo esc_attr( $settings['url'] ); ?>" placeholder="https://">
 				<p class="description"><?php esc_html_e( 'Paste the Google Sheets link for the tab you want. A "Publish to web" link in CSV format, or any other https link to a CSV file, also works when the sheet is read by link.', 'sheet-tables' ); ?></p>
+				<?php
+				$ref = sheet_tables_google_ref( $settings['url'] );
+
+				// The Share button's "Copy link" names no tab, and nothing
+				// else would tell the editor that another tab is being read.
+				if ( $ref && null === $ref['gid'] ) :
+					?>
+					<div class="notice notice-info inline"><p><?php esc_html_e( 'This link does not name a tab, so the sheet\'s first tab is read. To show another tab, open that tab in Google Sheets and copy the link from the browser\'s address bar, which ends in #gid= followed by the tab\'s number.', 'sheet-tables' ); ?></p></div>
+					<?php
+				endif;
+				?>
 			</td>
 		</tr>
 		<tr>
