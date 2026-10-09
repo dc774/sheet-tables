@@ -1,9 +1,14 @@
 /**
- * Sorting, filtering and paging for sheet tables.
+ * Sorting, filtering and paging for sheet tables, in both layouts.
  *
- * No library. The table is complete in the HTML before this runs; the script
- * only adds controls, so with JavaScript off a visitor gets the full table in
- * sheet order and no controls that do nothing.
+ * No library. The table or list is complete in the HTML before this runs;
+ * the script only adds controls, so with JavaScript off a visitor gets every
+ * row in sheet order and no controls that do nothing.
+ *
+ * Both layouts are handled as "items" (table rows or list items). A column's
+ * value in an item is the element carrying data-col="N", and what is known
+ * about each column comes from the wrapper's data-columns, so nothing here
+ * depends on which layout is showing.
  *
  * Filters can be set from the address: "#program-strategy=School%20wellness"
  * picks that value in the dropdown whose heading is "Program Strategy", and
@@ -17,6 +22,7 @@
 	var l10n = window.sheetTablesL10n || {};
 	var collator = new Intl.Collator( undefined, { numeric: true, sensitivity: 'base' } );
 	var PAGED_OUT = 'sheet-tables__paged-out';
+	var ALT = 'sheet-tables__alt';
 
 	function text( key, fallback ) {
 		return l10n[ key ] || fallback;
@@ -26,8 +32,8 @@
 		return template.replace( '%1$s', first ).replace( '%2$s', second );
 	}
 
-	function cellText( row, index ) {
-		var cell = row.cells[ index ];
+	function cellText( item, index ) {
+		var cell = item.querySelector( '[data-col="' + index + '"]' );
 
 		return cell ? cell.textContent.trim() : '';
 	}
@@ -53,8 +59,8 @@
 	}
 
 	// A cell's separate values: "School, Worksite" is two when split on ",".
-	function cellValues( row, index, separator ) {
-		var value = cellText( row, index );
+	function cellValues( item, index, separator ) {
+		var value = cellText( item, index );
 		var parts = separator ? value.split( separator ) : [ value ];
 
 		return parts.map( function ( part ) {
@@ -96,15 +102,23 @@
 	}
 
 	function setUp( wrapper ) {
+		var isList = wrapper.classList.contains( 'sheet-tables--list' );
 		var table = wrapper.querySelector( 'table' );
+		var container = isList ? wrapper.querySelector( '.sheet-tables__list' ) : table && table.tBodies[ 0 ];
+		var columns;
 
-		if ( ! table || ! table.tHead || ! table.tBodies.length ) {
+		try {
+			columns = JSON.parse( wrapper.getAttribute( 'data-columns' ) || '[]' );
+		} catch ( error ) {
 			return;
 		}
 
-		var body = table.tBodies[ 0 ];
-		var headers = table.tHead.rows[ 0 ].cells;
-		var total = body.rows.length;
+		if ( ! container || ( ! isList && ! table.tHead ) ) {
+			return;
+		}
+
+		var original = Array.prototype.slice.call( container.children );
+		var total = original.length;
 		var pageSize = parseInt( wrapper.getAttribute( 'data-page-size' ), 10 ) || 0;
 		var separator = wrapper.getAttribute( 'data-separator' ) || '';
 		var controls = document.createElement( 'div' );
@@ -114,6 +128,11 @@
 		var page = 1;
 		var pager = null;
 
+		function items() {
+			return Array.prototype.slice.call( container.children );
+		}
+
+		wrapper.classList.add( 'is-enhanced' );
 		controls.className = 'sheet-tables__controls';
 
 		// Announced to screen readers as the visible rows change.
@@ -126,8 +145,8 @@
 			controls.appendChild( control( 'sheet-tables__filter', text( 'filter', 'Filter rows' ), search ) );
 		}
 
-		Array.prototype.forEach.call( headers, function ( th, index ) {
-			if ( ! th.hasAttribute( 'data-facet' ) ) {
+		columns.forEach( function ( column, index ) {
+			if ( ! column.facet ) {
 				return;
 			}
 
@@ -135,8 +154,8 @@
 			var seen = {};
 			var values = [];
 
-			Array.prototype.forEach.call( body.rows, function ( row ) {
-				cellValues( row, index, separator ).forEach( function ( value ) {
+			original.forEach( function ( item ) {
+				cellValues( item, index, separator ).forEach( function ( value ) {
 					if ( ! seen[ value ] ) {
 						seen[ value ] = true;
 						values.push( value );
@@ -150,8 +169,8 @@
 				select.add( new Option( value, value ) );
 			} );
 
-			controls.appendChild( control( 'sheet-tables__facet', th.textContent.trim(), select ) );
-			facets.push( { index: index, param: th.getAttribute( 'data-param' ), select: select, seen: seen } );
+			controls.appendChild( control( 'sheet-tables__facet', column.label, select ) );
+			facets.push( { index: index, param: column.param, select: select, seen: seen } );
 		} );
 
 		// Set the controls from the address. A value from a link that the
@@ -169,38 +188,48 @@
 			} );
 		}
 
-		function matches( row ) {
+		// Search reads the values only, so a list's labels never match.
+		function matches( item ) {
 			var query = search ? search.value.trim().toLowerCase() : '';
 
-			if ( query && -1 === row.textContent.toLowerCase().indexOf( query ) ) {
-				return false;
+			if ( query ) {
+				var values = columns.map( function ( column, index ) {
+					return cellText( item, index );
+				} ).join( ' ' ).toLowerCase();
+
+				if ( -1 === values.indexOf( query ) ) {
+					return false;
+				}
 			}
 
 			return facets.every( function ( facet ) {
-				return ! facet.select.value || -1 !== cellValues( row, facet.index, separator ).indexOf( facet.select.value );
+				return ! facet.select.value || -1 !== cellValues( item, facet.index, separator ).indexOf( facet.select.value );
 			} );
 		}
 
 		function apply() {
-			var matched = Array.prototype.filter.call( body.rows, function ( row ) {
-				var match = matches( row );
+			var matched = items().filter( function ( item ) {
+				var match = matches( item );
 
-				row.hidden = ! match;
+				item.hidden = ! match;
 
 				return match;
 			} );
 			var pages = pageSize ? Math.max( 1, Math.ceil( matched.length / pageSize ) ) : 1;
-			var filtered = matched.length !== total;
+			var shown = 0;
 
 			page = Math.min( page, pages );
 
-			// Rows on other pages are not hidden, only classed, so print can
-			// still carry every row.
-			matched.forEach( function ( row, position ) {
-				row.classList.toggle( PAGED_OUT, pageSize > 0 && Math.floor( position / pageSize ) + 1 !== page );
+			// Items on other pages are not hidden, only classed, so print can
+			// still carry every row. Stripes follow what is actually visible.
+			matched.forEach( function ( item, position ) {
+				var pagedOut = pageSize > 0 && Math.floor( position / pageSize ) + 1 !== page;
+
+				item.classList.toggle( PAGED_OUT, pagedOut );
+				item.classList.toggle( ALT, ! pagedOut && 1 === shown++ % 2 );
 			} );
 
-			count.textContent = filtered ? format( text( 'count', 'Showing %1$s of %2$s rows' ), matched.length, total ) : '';
+			count.textContent = matched.length !== total ? format( text( 'count', 'Showing %1$s of %2$s rows' ), matched.length, total ) : '';
 
 			if ( pager ) {
 				pager.nav.hidden = pages < 2;
@@ -225,12 +254,67 @@
 			writeHash( values );
 		}
 
+		function sortBy( index, direction ) {
+			var sorted = index < 0 ? original.slice() : items().sort( function ( a, b ) {
+				return compare( cellText( a, index ), cellText( b, index ), direction );
+			} );
+
+			sorted.forEach( function ( item ) {
+				container.appendChild( item );
+			} );
+
+			// The order changed, so the pages did too.
+			page = 1;
+			apply();
+		}
+
 		if ( search ) {
 			search.addEventListener( 'input', changed );
 		}
 		facets.forEach( function ( facet ) {
 			facet.select.addEventListener( 'change', changed );
 		} );
+
+		if ( wrapper.hasAttribute( 'data-sort' ) && isList ) {
+			// A list has no column headings to click, so it gets a dropdown.
+			var order = document.createElement( 'select' );
+
+			order.add( new Option( text( 'sheetOrder', 'Sheet order' ), '' ) );
+			columns.forEach( function ( column, index ) {
+				order.add( new Option( text( 'ascending', '%s, A to Z' ).replace( '%s', column.label ), index + ':1' ) );
+				order.add( new Option( text( 'descending', '%s, Z to A' ).replace( '%s', column.label ), index + ':-1' ) );
+			} );
+			order.addEventListener( 'change', function () {
+				var parts = order.value.split( ':' );
+
+				sortBy( order.value ? parseInt( parts[ 0 ], 10 ) : -1, parseInt( parts[ 1 ], 10 ) || 1 );
+			} );
+			controls.appendChild( control( 'sheet-tables__order', text( 'sortBy', 'Sort by' ), order ) );
+		} else if ( wrapper.hasAttribute( 'data-sort' ) ) {
+			var headers = table.tHead.rows[ 0 ].cells;
+
+			Array.prototype.forEach.call( headers, function ( th, index ) {
+				var button = document.createElement( 'button' );
+
+				button.type = 'button';
+				button.className = 'sheet-tables__sort';
+
+				while ( th.firstChild ) {
+					button.appendChild( th.firstChild );
+				}
+				th.appendChild( button );
+
+				button.addEventListener( 'click', function () {
+					var direction = 'ascending' === th.getAttribute( 'aria-sort' ) ? -1 : 1;
+
+					Array.prototype.forEach.call( headers, function ( other ) {
+						other.removeAttribute( 'aria-sort' );
+					} );
+					th.setAttribute( 'aria-sort', 1 === direction ? 'ascending' : 'descending' );
+					sortBy( index, direction );
+				} );
+			} );
+		}
 
 		if ( pageSize ) {
 			pager = {
@@ -260,41 +344,6 @@
 			} );
 
 			wrapper.appendChild( pager.nav );
-		}
-
-		if ( wrapper.hasAttribute( 'data-sort' ) ) {
-			Array.prototype.forEach.call( headers, function ( th, index ) {
-				var button = document.createElement( 'button' );
-
-				button.type = 'button';
-				button.className = 'sheet-tables__sort';
-
-				while ( th.firstChild ) {
-					button.appendChild( th.firstChild );
-				}
-				th.appendChild( button );
-
-				button.addEventListener( 'click', function () {
-					var direction = 'ascending' === th.getAttribute( 'aria-sort' ) ? -1 : 1;
-					var rows = Array.prototype.slice.call( body.rows );
-
-					Array.prototype.forEach.call( headers, function ( other ) {
-						other.removeAttribute( 'aria-sort' );
-					} );
-					th.setAttribute( 'aria-sort', 1 === direction ? 'ascending' : 'descending' );
-
-					rows.sort( function ( a, b ) {
-						return compare( cellText( a, index ), cellText( b, index ), direction );
-					} );
-					rows.forEach( function ( row ) {
-						body.appendChild( row );
-					} );
-
-					// The order changed, so the pages did too.
-					page = 1;
-					apply();
-				} );
-			} );
 		}
 
 		if ( controls.firstChild ) {

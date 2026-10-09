@@ -14,7 +14,9 @@ includes/settings.php     Meta fields, the settings box, the save handler.
 includes/fetch.php        Read, parse, whitelist, cache, fall back, faults.
 includes/google.php       Service account: key, access token, Sheets API read,
                           Settings > Sheet Tables.
-includes/render.php       Shortcode, block registration, table markup, assets.
+includes/render.php       Shortcode, block registration, table and list markup, assets.
+includes/icons.php        Values shown as icons: built-in set, custom lines, markup.
+assets/icons/             The built-in icons (SVG, used as CSS masks).
 includes/status.php       Tools > Sheet Tables.
 block/                    block.json, the editor script, its asset file.
 assets/                   Front-end sort/filter script and stylesheet.
@@ -157,6 +159,40 @@ editor preview is `ServerSideRender`, so there is one markup.
   WordPress query vars such as `year` or `search`, and does not split the page
   cache. Values a column does not hold are ignored.
 
+## Appearance
+
+Data lives on the table post; appearance lives on the block (or shortcode
+attributes), so one table can look different in different places.
+
+- `sheet_tables_display_options()` reduces block attributes or shortcode atts
+  to known words: `layout` (table, list), `style` (striped, bordered,
+  compact), `heading` (2-6), `sticky`, and per-column `align`, `width`,
+  `label`, `display` (text, icons). Anything else falls back to a default, and
+  everything reaching the markup is a class name, never CSS.
+- The block also declares WordPress's colour, typography, spacing and border
+  supports and four block styles in block.json; those land on the wrapper
+  through `get_block_wrapper_attributes()`. block.json's `style` loads the
+  stylesheet in the editor preview too.
+- `sheet_tables_render_table()` and `sheet_tables_render_list()` share
+  `sheet_tables_cell_html()`. In the list, the first column not shown as icons
+  is each item's heading, icon columns listed before it sit beside it, and the
+  rest are `dt`/`dd` pairs. Alignment and width apply to tables only; the
+  label option to lists only, so no table heading is ever hidden on phones
+  alone. Nothing visible on a computer is removed at narrow widths.
+- Icons (`includes/icons.php`): a value matches a custom line first, then the
+  built-in set (`sheet_tables_builtin_icons()`, filterable as
+  `sheet_tables_icon_values`), else stays text. The icon is `aria-hidden`; the
+  value is kept as `.sheet-tables__sr` text (with the separator between
+  values), so screen readers, search, filters and sort read the same words.
+- The script works on "items" (table rows or list items). A column's value is
+  the element with `data-col`, and column metadata comes from the wrapper's
+  `data-columns` JSON, so both layouts share one code path. Striping is
+  recalculated for visible items once the script runs.
+- Sticky header: the scroll box gets a height so the header can stick in it,
+  and the table's `overflow` is set back to visible because some themes hide
+  it, which stops sticking. With a block background colour the header
+  inherits it; otherwise `--sheet-tables-header-background`, default `Canvas`.
+
 ## Caching upstream
 
 `sheet_tables_cache_max_age()` filters `pantheon_cache_default_max_age` to
@@ -183,6 +219,7 @@ a notice and then removed from the address bar.
 
 - `sheet_tables_cache_ttl` (seconds, post ID): a table's cache lifetime.
 - `sheet_tables_status_capability`: who sees the status screen.
+- `sheet_tables_icon_values`: the cell values each built-in icon stands for.
 
 ## Rules
 

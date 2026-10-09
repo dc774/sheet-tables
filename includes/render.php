@@ -36,7 +36,7 @@ function sheet_tables_register_block() {
  * @return string
  */
 function sheet_tables_render_block( $attributes ) {
-	$html = sheet_tables_render( absint( $attributes['id'] ?? 0 ) );
+	$html = sheet_tables_render( absint( $attributes['id'] ?? 0 ), $attributes );
 
 	if ( '' === $html ) {
 		return '';
@@ -61,10 +61,23 @@ function sheet_tables_block_editor_data() {
 
 	$list = array_map(
 		function ( $table ) {
+			$settings = sheet_tables_get_settings( $table->ID );
+			$columns  = array();
+
+			// From the table's settings, not the sheet: the sidebar lists the
+			// chosen columns without reading anything.
+			foreach ( $settings['columns'] as $name => $heading ) {
+				$columns[] = array(
+					'name'    => (string) $name,
+					'heading' => (string) $heading,
+				);
+			}
+
 			return array(
-				'id'    => $table->ID,
+				'id'      => $table->ID,
 				/* translators: 1: table title, 2: table ID. */
-				'title' => sprintf( __( '%1$s (#%2$d)', 'sheet-tables' ), $table->post_title, $table->ID ),
+				'title'   => sprintf( __( '%1$s (#%2$d)', 'sheet-tables' ), $table->post_title, $table->ID ),
+				'columns' => $columns,
 			);
 		},
 		$tables
@@ -104,15 +117,21 @@ function sheet_tables_register_assets() {
 		'sheet-tables',
 		'sheetTablesL10n',
 		array(
-			'filter'   => __( 'Filter rows', 'sheet-tables' ),
+			'filter'     => __( 'Filter rows', 'sheet-tables' ),
 			/* translators: 1: number of rows shown, 2: number of rows in the table. */
-			'count'    => __( 'Showing %1$s of %2$s rows', 'sheet-tables' ),
-			'any'      => __( 'Any', 'sheet-tables' ),
-			'pages'    => __( 'Table pages', 'sheet-tables' ),
+			'count'      => __( 'Showing %1$s of %2$s rows', 'sheet-tables' ),
+			'any'        => __( 'Any', 'sheet-tables' ),
+			'pages'      => __( 'Table pages', 'sheet-tables' ),
 			/* translators: 1: current page number, 2: number of pages. */
-			'page'     => __( 'Page %1$s of %2$s', 'sheet-tables' ),
-			'previous' => __( 'Previous', 'sheet-tables' ),
-			'next'     => __( 'Next', 'sheet-tables' ),
+			'page'       => __( 'Page %1$s of %2$s', 'sheet-tables' ),
+			'previous'   => __( 'Previous', 'sheet-tables' ),
+			'next'       => __( 'Next', 'sheet-tables' ),
+			'sortBy'     => __( 'Sort by', 'sheet-tables' ),
+			'sheetOrder' => __( 'Sheet order', 'sheet-tables' ),
+			/* translators: %s: column heading. */
+			'ascending'  => __( '%s, A to Z', 'sheet-tables' ),
+			/* translators: %s: column heading. */
+			'descending' => __( '%s, Z to A', 'sheet-tables' ),
 		)
 	);
 }
@@ -120,22 +139,99 @@ function sheet_tables_register_assets() {
 /**
  * Render [sheet_table id="123"].
  *
+ * Besides the table's id it takes the appearance options that make sense
+ * without the block's sidebar: layout="list", style="striped" (or bordered,
+ * compact), heading="2" to "6" for list titles, and sticky="1".
+ *
  * @param array|string $atts Shortcode attributes.
  * @return string
  */
 function sheet_tables_shortcode( $atts ) {
-	$atts = shortcode_atts( array( 'id' => 0 ), $atts, 'sheet_table' );
+	$atts = shortcode_atts(
+		array(
+			'id'      => 0,
+			'layout'  => 'table',
+			'style'   => '',
+			'heading' => 3,
+			'sticky'  => '',
+		),
+		$atts,
+		'sheet_table'
+	);
 
-	return sheet_tables_render( absint( $atts['id'] ) );
+	return sheet_tables_render(
+		absint( $atts['id'] ),
+		array(
+			'layout'       => $atts['layout'],
+			'style'        => $atts['style'],
+			'headingLevel' => $atts['heading'],
+			'sticky'       => rest_sanitize_boolean( $atts['sticky'] ),
+		)
+	);
+}
+
+/**
+ * Appearance options, reduced to known values.
+ *
+ * They come from block attributes or shortcode attributes, so from anyone
+ * who can edit a post. Everything that reaches the markup is one of a fixed
+ * set of words, used as a class name, never as CSS.
+ *
+ * @param array $raw Block or shortcode attributes.
+ * @return array{layout: string, style: string, heading: int, sticky: bool, columns: array}
+ */
+function sheet_tables_display_options( $raw ) {
+	$raw     = is_array( $raw ) ? $raw : array();
+	$columns = array();
+
+	foreach ( (array) ( $raw['columns'] ?? array() ) as $name => $options ) {
+		if ( ! is_array( $options ) ) {
+			continue;
+		}
+
+		$columns[ (string) $name ] = array(
+			'align'   => in_array( $options['align'] ?? '', array( 'center', 'end' ), true ) ? $options['align'] : 'start',
+			'width'   => in_array( $options['width'] ?? '', array( 'narrow', 'medium', 'wide' ), true ) ? $options['width'] : 'auto',
+			'label'   => false !== ( $options['label'] ?? true ),
+			'display' => 'icons' === ( $options['display'] ?? '' ) ? 'icons' : 'text',
+		);
+	}
+
+	$level = (int) ( $raw['headingLevel'] ?? 3 );
+
+	return array(
+		'layout'  => 'list' === ( $raw['layout'] ?? '' ) ? 'list' : 'table',
+		'style'   => in_array( $raw['style'] ?? '', array( 'striped', 'bordered', 'compact' ), true ) ? $raw['style'] : '',
+		'heading' => ( $level >= 2 && $level <= 6 ) ? $level : 3,
+		'sticky'  => ! empty( $raw['sticky'] ),
+		'columns' => $columns,
+	);
+}
+
+/**
+ * One column's appearance options, with defaults for columns not set.
+ *
+ * @param array  $display From sheet_tables_display_options().
+ * @param string $name    Source column name.
+ * @return array{align: string, width: string, label: bool, display: string}
+ */
+function sheet_tables_column_display( $display, $name ) {
+	return $display['columns'][ (string) $name ] ?? array(
+		'align'   => 'start',
+		'width'   => 'auto',
+		'label'   => true,
+		'display' => 'text',
+	);
 }
 
 /**
  * The HTML for one table.
  *
- * @param int $post_id Table post ID.
+ * @param int   $post_id Table post ID.
+ * @param array $display Appearance options, as block or shortcode attributes.
  * @return string
  */
-function sheet_tables_render( $post_id ) {
+function sheet_tables_render( $post_id, $display = array() ) {
 	$post = $post_id ? get_post( $post_id ) : null;
 
 	if ( ! $post || SHEET_TABLES_POST_TYPE !== $post->post_type || 'publish' !== $post->post_status ) {
@@ -149,6 +245,7 @@ function sheet_tables_render( $post_id ) {
 	}
 
 	$settings = sheet_tables_get_settings( $post_id );
+	$display  = sheet_tables_display_options( $display );
 	$columns  = sheet_tables_used_columns( sheet_tables_display_columns( $settings ), $data['header'], $data['rows'] );
 
 	if ( ! $columns ) {
@@ -163,9 +260,28 @@ function sheet_tables_render( $post_id ) {
 		wp_enqueue_script( 'sheet-tables' );
 	}
 
+	// What the script needs to know about each column, in display order. The
+	// same for both layouts, so the script never reads it from the markup.
+	$meta = array();
+
+	foreach ( $columns as $index => $name ) {
+		$meta[] = array(
+			'label' => $settings['columns'][ $name ],
+			'param' => sheet_tables_param( $settings['columns'][ $name ], $index ),
+			'facet' => in_array( $name, $facets, true ),
+		);
+	}
+
 	// The visitor tools are switched on by these attributes and built by the
 	// script, so with JavaScript off there are no controls that do nothing.
-	$attributes = array();
+	$attributes = array(
+		'class'        => trim(
+			'sheet-tables sheet-tables--' . $display['layout']
+			. ( $display['style'] ? ' is-style-' . $display['style'] : '' )
+			. ( $display['sticky'] && 'table' === $display['layout'] ? ' has-sticky-header' : '' )
+		),
+		'data-columns' => wp_json_encode( $meta ),
+	);
 
 	if ( $settings['sort'] ) {
 		$attributes['data-sort'] = '';
@@ -183,41 +299,130 @@ function sheet_tables_render( $post_id ) {
 		$attributes['data-separator'] = $settings['separator'];
 	}
 
+	$label = '' !== $settings['caption'] ? $settings['caption'] : get_the_title( $post );
+
 	ob_start();
 	?>
-	<div class="sheet-tables"<?php foreach ( $attributes as $attribute => $value ) : ?> <?php echo esc_attr( $attribute ); ?>="<?php echo esc_attr( $value ); ?>"<?php endforeach; ?>>
-		<?php // Focusable and named, so keyboard users can scroll a wide table too. ?>
-		<div class="sheet-tables__scroll" role="region" tabindex="0" aria-label="<?php echo esc_attr( '' !== $settings['caption'] ? $settings['caption'] : get_the_title( $post ) ); ?>">
-		<table class="sheet-tables__table">
-			<?php if ( '' !== $settings['caption'] ) : ?>
-				<caption><?php echo esc_html( $settings['caption'] ); ?></caption>
-			<?php endif; ?>
-			<thead>
-				<tr>
-					<?php foreach ( $columns as $index => $name ) : ?>
-						<?php if ( in_array( $name, $facets, true ) ) : ?>
-							<th scope="col" data-facet data-param="<?php echo esc_attr( sheet_tables_param( $settings['columns'][ $name ], $index ) ); ?>"><?php echo esc_html( $settings['columns'][ $name ] ); ?></th>
-						<?php else : ?>
-							<th scope="col"><?php echo esc_html( $settings['columns'][ $name ] ); ?></th>
-						<?php endif; ?>
-					<?php endforeach; ?>
-				</tr>
-			</thead>
-			<tbody>
-				<?php foreach ( $data['rows'] as $row ) : ?>
-					<tr>
-						<?php foreach ( $columns as $name ) : ?>
-							<td data-label="<?php echo esc_attr( $settings['columns'][ $name ] ); ?>"><?php echo sheet_tables_cell_html( $row, $name, $settings ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in sheet_tables_cell_html(). ?></td>
-						<?php endforeach; ?>
-					</tr>
-				<?php endforeach; ?>
-			</tbody>
-		</table>
-		</div>
+	<div<?php foreach ( $attributes as $attribute => $value ) : ?> <?php echo esc_attr( $attribute ); ?>="<?php echo esc_attr( $value ); ?>"<?php endforeach; ?>>
+		<?php
+		if ( 'list' === $display['layout'] ) {
+			sheet_tables_render_list( $data['rows'], $columns, $settings, $display, $label );
+		} else {
+			sheet_tables_render_table( $data['rows'], $columns, $settings, $display, $label );
+		}
+		?>
 	</div>
 	<?php
 
 	return ob_get_clean();
+}
+
+/**
+ * Print the table layout.
+ *
+ * @param array[]  $rows     Stored rows.
+ * @param string[] $columns  Source column names shown, in order.
+ * @param array    $settings From sheet_tables_get_settings().
+ * @param array    $display  From sheet_tables_display_options().
+ * @param string   $label    Accessible name for the scroll box.
+ */
+function sheet_tables_render_table( $rows, $columns, $settings, $display, $label ) {
+	?>
+	<?php // Focusable and named, so keyboard users can scroll a wide table too. ?>
+	<div class="sheet-tables__scroll" role="region" tabindex="0" aria-label="<?php echo esc_attr( $label ); ?>">
+	<table class="sheet-tables__table">
+		<?php if ( '' !== $settings['caption'] ) : ?>
+			<caption><?php echo esc_html( $settings['caption'] ); ?></caption>
+		<?php endif; ?>
+		<thead>
+			<tr>
+				<?php foreach ( $columns as $name ) : ?>
+					<?php $column = sheet_tables_column_display( $display, $name ); ?>
+					<th scope="col" class="<?php echo esc_attr( 'sheet-tables__align-' . $column['align'] . ' sheet-tables__width-' . $column['width'] ); ?>"><?php echo esc_html( $settings['columns'][ $name ] ); ?></th>
+				<?php endforeach; ?>
+			</tr>
+		</thead>
+		<tbody>
+			<?php foreach ( $rows as $row ) : ?>
+				<tr>
+					<?php foreach ( $columns as $index => $name ) : ?>
+						<?php $column = sheet_tables_column_display( $display, $name ); ?>
+						<td data-col="<?php echo esc_attr( $index ); ?>" data-label="<?php echo esc_attr( $settings['columns'][ $name ] ); ?>" class="<?php echo esc_attr( 'sheet-tables__align-' . $column['align'] ); ?>"><?php echo sheet_tables_cell_html( $row, $name, $settings, 'icons' === $column['display'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in sheet_tables_cell_html(). ?></td>
+					<?php endforeach; ?>
+				</tr>
+			<?php endforeach; ?>
+		</tbody>
+	</table>
+	</div>
+	<?php
+}
+
+/**
+ * Print the list layout.
+ *
+ * Each row is a list item: the first column not shown as icons is its
+ * heading, icon columns listed before it sit beside the heading, and every
+ * other column is a labelled detail. Empty cells are left out.
+ *
+ * @param array[]  $rows     Stored rows.
+ * @param string[] $columns  Source column names shown, in order.
+ * @param array    $settings From sheet_tables_get_settings().
+ * @param array    $display  From sheet_tables_display_options().
+ * @param string   $label    Accessible name for the list.
+ */
+function sheet_tables_render_list( $rows, $columns, $settings, $display, $label ) {
+	$title = null;
+
+	foreach ( $columns as $index => $name ) {
+		if ( 'icons' !== sheet_tables_column_display( $display, $name )['display'] ) {
+			$title = $index;
+			break;
+		}
+	}
+
+	$tag = 'h' . $display['heading'];
+	?>
+	<?php if ( '' !== $settings['caption'] ) : ?>
+		<p class="sheet-tables__caption"><?php echo esc_html( $settings['caption'] ); ?></p>
+	<?php endif; ?>
+	<?php // role="list" because Safari stops announcing a list once its bullets are removed. ?>
+	<ul class="sheet-tables__list" role="list" aria-label="<?php echo esc_attr( $label ); ?>">
+		<?php foreach ( $rows as $row ) : ?>
+			<li class="sheet-tables__item">
+				<?php if ( null !== $title && '' !== (string) ( $row[ $columns[ $title ] ] ?? '' ) ) : ?>
+					<<?php echo esc_attr( $tag ); ?> class="sheet-tables__title">
+						<?php foreach ( array_slice( $columns, 0, $title, true ) as $index => $name ) : ?>
+							<?php if ( '' !== (string) ( $row[ $name ] ?? '' ) ) : ?>
+								<span class="sheet-tables__lead" data-col="<?php echo esc_attr( $index ); ?>"><?php echo sheet_tables_cell_html( $row, $name, $settings, true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in sheet_tables_cell_html(). ?></span>
+							<?php endif; ?>
+						<?php endforeach; ?>
+						<span data-col="<?php echo esc_attr( $title ); ?>"><?php echo sheet_tables_cell_html( $row, $columns[ $title ], $settings, false ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in sheet_tables_cell_html(). ?></span>
+					</<?php echo esc_attr( $tag ); ?>>
+				<?php endif; ?>
+				<dl class="sheet-tables__details">
+					<?php foreach ( $columns as $index => $name ) : ?>
+						<?php
+						// The heading and the icons beside it are already shown.
+						if ( null !== $title && $index <= $title && '' !== (string) ( $row[ $columns[ $title ] ] ?? '' ) ) {
+							continue;
+						}
+
+						if ( '' === (string) ( $row[ $name ] ?? '' ) ) {
+							continue;
+						}
+
+						$column = sheet_tables_column_display( $display, $name );
+						?>
+						<div class="sheet-tables__detail">
+							<dt class="<?php echo $column['label'] ? '' : 'sheet-tables__sr'; ?>"><?php echo esc_html( $settings['columns'][ $name ] ); ?></dt>
+							<dd data-col="<?php echo esc_attr( $index ); ?>"><?php echo sheet_tables_cell_html( $row, $name, $settings, 'icons' === $column['display'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in sheet_tables_cell_html(). ?></dd>
+						</div>
+					<?php endforeach; ?>
+				</dl>
+			</li>
+		<?php endforeach; ?>
+	</ul>
+	<?php
 }
 
 /**
@@ -237,7 +442,7 @@ function sheet_tables_param( $heading, $index ) {
 }
 
 /**
- * One cell's contents: escaped text, linked when the table says so.
+ * One cell's contents: escaped text or icons, linked when the table says so.
  *
  * The address comes from the sheet, so only http and https are allowed;
  * anything else, a javascript: address included, leaves plain text.
@@ -245,11 +450,12 @@ function sheet_tables_param( $heading, $index ) {
  * @param array  $row      Stored row.
  * @param string $name     Source column name.
  * @param array  $settings From sheet_tables_get_settings().
+ * @param bool   $as_icons Whether the column is shown as icons.
  * @return string Escaped HTML.
  */
-function sheet_tables_cell_html( $row, $name, $settings ) {
+function sheet_tables_cell_html( $row, $name, $settings, $as_icons = false ) {
 	$text = (string) ( $row[ $name ] ?? '' );
-	$html = nl2br( esc_html( $text ) );
+	$html = $as_icons ? sheet_tables_icons_html( $text, $settings ) : nl2br( esc_html( $text ) );
 
 	if ( '' === $text || ! isset( $settings['links'][ $name ] ) ) {
 		return $html;

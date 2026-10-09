@@ -12,11 +12,54 @@
 		"id": {
 			"type": "integer",
 			"default": 0
+		},
+		"layout": {
+			"type": "string",
+			"enum": [ "table", "list" ],
+			"default": "table"
+		},
+		"headingLevel": {
+			"type": "integer",
+			"default": 3
+		},
+		"sticky": {
+			"type": "boolean",
+			"default": false
+		},
+		"columns": {
+			"type": "object",
+			"default": {}
 		}
 	},
 	"supports": {
 		"html": false,
-		"align": [ "wide", "full" ]
+		"align": [ "wide", "full" ],
+		"color": {
+			"text": true,
+			"background": true,
+			"link": true
+		},
+		"typography": {
+			"fontSize": true,
+			"lineHeight": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"__experimentalBorder": {
+			"color": true,
+			"radius": true,
+			"style": true,
+			"width": true
+		}
 	},
-	"editorScript": "file:./index.js"
+	"styles": [
+		{ "name": "default", "label": "Default", "isDefault": true },
+		{ "name": "striped", "label": "Striped" },
+		{ "name": "bordered", "label": "Bordered" },
+		{ "name": "compact", "label": "Compact" }
+	],
+	"editorScript": "file:./index.js",
+	"style": "sheet-tables"
 }

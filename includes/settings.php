@@ -42,6 +42,11 @@ function sheet_tables_meta_fields() {
 			'default'  => '',
 			'sanitize' => 'sanitize_textarea_field',
 		),
+		'_sheet_tables_icons'         => array(
+			'type'     => 'string',
+			'default'  => '',
+			'sanitize' => 'sanitize_textarea_field',
+		),
 		'_sheet_tables_row_filter'    => array(
 			'type'     => 'string',
 			'default'  => '',
@@ -226,7 +231,7 @@ function sheet_tables_parse_row_filter( $text ) {
  *
  * Filter dropdowns are listed by source column name, one per line.
  *
- * @return array{url: string, access: string, columns: array<string, string>, links: array<string, string>, row_filter: array, markers: string[], cache_minutes: int, caption: string, sort: bool, search: bool, facets: string[], separator: string, page_size: int}
+ * @return array{url: string, access: string, columns: array<string, string>, links: array<string, string>, icons: array<string, string>, row_filter: array, markers: string[], cache_minutes: int, caption: string, sort: bool, search: bool, facets: string[], separator: string, page_size: int}
  */
 function sheet_tables_get_settings( $post_id ) {
 	$markers = explode( ',', (string) get_post_meta( $post_id, '_sheet_tables_markers', true ) );
@@ -236,6 +241,7 @@ function sheet_tables_get_settings( $post_id ) {
 		'access'        => sheet_tables_sanitize_access( get_post_meta( $post_id, '_sheet_tables_access', true ) ),
 		'columns'       => sheet_tables_parse_columns( get_post_meta( $post_id, '_sheet_tables_columns', true ) ),
 		'links'         => sheet_tables_parse_columns( get_post_meta( $post_id, '_sheet_tables_links', true ) ),
+		'icons'         => sheet_tables_parse_columns( get_post_meta( $post_id, '_sheet_tables_icons', true ) ),
 		'row_filter'    => sheet_tables_parse_row_filter( get_post_meta( $post_id, '_sheet_tables_row_filter', true ) ),
 		'markers'       => array_values( array_filter( array_map( 'trim', $markers ), 'strlen' ) ),
 		'cache_minutes' => sheet_tables_sanitize_minutes( get_post_meta( $post_id, '_sheet_tables_cache_minutes', true ) ),
@@ -411,6 +417,13 @@ function sheet_tables_render_meta_box( $post ) {
 			<td>
 				<textarea id="sheet-tables-links" name="sheet_tables_links" class="large-text code" rows="3"><?php echo esc_textarea( (string) get_post_meta( $post->ID, '_sheet_tables_links', true ) ); ?></textarea>
 				<p class="description"><?php esc_html_e( 'Optional. Make a column\'s text a link: one per line, the column shown, a bar, then the column holding the web address, for example "Title | Public URL". The address column is read for this, but shown only if it is also listed under Columns. Only http and https addresses become links.', 'sheet-tables' ); ?></p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><label for="sheet-tables-icons"><?php esc_html_e( 'Custom icons', 'sheet-tables' ); ?></label></th>
+			<td>
+				<textarea id="sheet-tables-icons" name="sheet_tables_icons" class="large-text code" rows="3"><?php echo esc_textarea( (string) get_post_meta( $post->ID, '_sheet_tables_icons', true ) ); ?></textarea>
+				<p class="description"><?php esc_html_e( 'Optional. For columns the Sheet Table block shows as icons: one per line, a value, a bar, then the web address of its icon image, for example "Recipe | https://example.org/recipe.svg". Upload icons to the Media Library and copy their address. These replace the built-in icons for PDF, Word, Excel, PowerPoint, video, audio, image and web link files. Values with no icon stay as text.', 'sheet-tables' ); ?></p>
 			</td>
 		</tr>
 		<tr>

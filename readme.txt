@@ -4,7 +4,7 @@ Tags: google sheets, spreadsheet, table, csv, shortcode
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -37,13 +37,23 @@ It was built for sheets that are shared working documents, with columns the publ
 * Works without JavaScript: visitors get the complete table in sheet order.
 * No libraries and nothing loaded from a CDN. The stylesheet and script load only on pages that show a table.
 
+**Looks the way you want, without a design tool.**
+
+* Show a table as a table, or as a list: each row a heading (linked, if you like) with its details beneath, as a resource library usually looks.
+* The block has WordPress's own colour, typography, spacing and border settings, so it can use your theme's palette and fonts.
+* Block styles: Striped, Bordered and Compact.
+* Per column, in the block sidebar: alignment and width (tables), whether its label shows (lists), and whether its values show as icons.
+* Built-in file-type icons for PDF, Word, Excel, PowerPoint, video, audio, image and web link values, plus your own icons for any other value. The word is still read out by screen readers, and search and filters still find it.
+* An optional sticky header row for long tables.
+* On a phone, everything visible on a computer is still there: rows reflow, nothing is hidden.
+
 **Everything else you would expect.**
 
 * Any number of tables, each with its own sheet, columns, headings and refresh interval.
 * Rename any column's heading for display.
 * Turn a column's text into a link using a web address from another column, such as a title linking to its file.
 * Finds the header row even when the sheet has title or instruction rows above it.
-* A block and a shortcode, `[sheet_table id="123"]`.
+* A block and a shortcode, `[sheet_table id="123"]`. The shortcode also takes `layout="list"`, `style="striped"` (or `bordered`, `compact`), `heading="2"` to `"6"` for list headings, and `sticky="1"`.
 * No account, no premium version, no tracking.
 
 == Installation ==
@@ -96,6 +106,10 @@ To make a column required, list it under "Header row" too. The header row is the
 
 Some themes limit the editor to an approved list of blocks. If yours does, add `sheet-tables/table` to that list to use the Sheet Table block, or ask whoever maintains the theme to add it. In the meantime the shortcode works in any paragraph: type `[sheet_table id="123"]`, using the id shown on the table's edit screen.
 
+= How do icons work? =
+
+In the Sheet Table block's sidebar, open Columns, pick a column such as "Format" or "Type", and set "Show values as" to Icons. Values such as PDF, Word, docx, Excel, xlsx, PowerPoint, Video, Audio, Image or Web page get a built-in icon, drawn in the text colour. For anything else, upload an icon to the Media Library and add a line to the table's "Custom icons" setting, such as `Recipe | https://example.org/wp-content/uploads/recipe.svg`. A value with no icon stays as text.
+
 = Is anything from the sheet stored in my database? =
 
 Only the columns you chose: the current copy (as a transient) and the last good copy (as an option), both removed when the table or the plugin is deleted.
@@ -112,6 +126,13 @@ The site's server reads the sheet when a table is shown and its stored copy has 
 Google Sheets is provided by Google: [Terms of Service](https://policies.google.com/terms), [Privacy Policy](https://policies.google.com/privacy).
 
 == Changelog ==
+
+= 1.2.0 =
+* List layout: each row as a heading with labelled details, with a "Sort by" menu.
+* WordPress colour, typography, spacing and border settings on the block, and Striped, Bordered and Compact block styles.
+* Per-column alignment, width, label and icon settings in the block sidebar.
+* Icons for values: built-in file-type icons, and custom icons from the table settings.
+* Optional sticky header row.
 
 = 1.1.0 =
 * Private sheets: read a sheet shared only with the site's Google service account.
