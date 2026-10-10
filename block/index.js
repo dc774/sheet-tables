@@ -41,49 +41,91 @@
 		} ) );
 	}
 
-	function layoutPanel( props ) {
-		var attributes = props.attributes;
-		var isList = 'list' === attributes.layout;
+	function select( props, attribute, label, choices, help ) {
+		return el( components.SelectControl, withModern( {
+			label: label,
+			value: String( props.attributes[ attribute ] ),
+			options: choices.map( function ( choice ) {
+				return { value: String( choice[ 0 ] ), label: choice[ 1 ] };
+			} ),
+			help: help || null,
+			onChange: function ( value ) {
+				var update = {};
 
-		return el(
-			components.PanelBody,
-			{ title: __( 'Layout', 'sheet-tables' ) },
-			el( components.SelectControl, withModern( {
-				label: __( 'Show as', 'sheet-tables' ),
-				value: attributes.layout,
-				options: [
-					{ value: 'table', label: __( 'Table', 'sheet-tables' ) },
-					{ value: 'list', label: __( 'List', 'sheet-tables' ) },
-				],
-				help: isList
-					? __( 'Each row becomes a list item. The first column not shown as icons is its heading; icon columns listed before it appear beside the heading.', 'sheet-tables' )
-					: null,
-				onChange: function ( value ) {
-					props.setAttributes( { layout: value } );
-				},
-			} ) ),
-			isList
-				? el( components.SelectControl, withModern( {
-					label: __( 'Heading level for each item', 'sheet-tables' ),
-					value: String( attributes.headingLevel ),
-					options: [ 2, 3, 4, 5, 6 ].map( function ( level ) {
-						return { value: String( level ), label: 'H' + level };
-					} ),
-					help: __( 'Pick the level that fits under the page\'s own headings.', 'sheet-tables' ),
-					onChange: function ( value ) {
-						props.setAttributes( { headingLevel: parseInt( value, 10 ) } );
-					},
-				} ) )
-				: el( components.ToggleControl, {
-					__nextHasNoMarginBottom: true,
-					label: __( 'Keep the header row in view while scrolling', 'sheet-tables' ),
-					help: __( 'The table scrolls inside a box at most as tall as the screen.', 'sheet-tables' ),
-					checked: !! attributes.sticky,
-					onChange: function ( value ) {
-						props.setAttributes( { sticky: value } );
-					},
-				} )
-		);
+				update[ attribute ] = 'headingLevel' === attribute ? parseInt( value, 10 ) : value;
+				props.setAttributes( update );
+			},
+		} ) );
+	}
+
+	function toggle( props, attribute, label, help ) {
+		return el( components.ToggleControl, {
+			__nextHasNoMarginBottom: true,
+			label: label,
+			help: help || null,
+			checked: !! props.attributes[ attribute ],
+			onChange: function ( value ) {
+				var update = {};
+
+				update[ attribute ] = value;
+				props.setAttributes( update );
+			},
+		} );
+	}
+
+	// Each layout has its own options; only the chosen layout's are shown.
+	function layoutPanel( props ) {
+		var isList = 'list' === props.attributes.layout;
+		var controls = [
+			select( props, 'layout', __( 'Show as', 'sheet-tables' ), [
+				[ 'table', __( 'Table', 'sheet-tables' ) ],
+				[ 'list', __( 'List', 'sheet-tables' ) ],
+			], isList ? __( 'Each row becomes a list item. The first column is its heading; a column of icons listed before it appears beside the heading.', 'sheet-tables' ) : null ),
+		];
+
+		if ( isList ) {
+			controls.push(
+				select( props, 'headingLevel', __( 'Heading level for each item', 'sheet-tables' ), [ 2, 3, 4, 5, 6 ].map( function ( level ) {
+					return [ level, 'H' + level ];
+				} ), __( 'Pick the level that fits under the page\'s own headings.', 'sheet-tables' ) ),
+				select( props, 'itemSpacing', __( 'Space between items', 'sheet-tables' ), [
+					[ 'normal', __( 'Normal', 'sheet-tables' ) ],
+					[ 'compact', __( 'Compact', 'sheet-tables' ) ],
+					[ 'roomy', __( 'Roomy', 'sheet-tables' ) ],
+				] ),
+				toggle( props, 'dividers', __( 'Divider lines between items', 'sheet-tables' ) ),
+				select( props, 'labels', __( 'Labels', 'sheet-tables' ), [
+					[ 'beside', __( 'Beside their values', 'sheet-tables' ) ],
+					[ 'above', __( 'Above their values', 'sheet-tables' ) ],
+				] ),
+				select( props, 'detailSpacing', __( 'Space between details', 'sheet-tables' ), [
+					[ 'normal', __( 'Normal', 'sheet-tables' ) ],
+					[ 'compact', __( 'Compact', 'sheet-tables' ) ],
+				] )
+			);
+		} else {
+			controls.push(
+				toggle( props, 'striped', __( 'Striped rows', 'sheet-tables' ) ),
+				select( props, 'lines', __( 'Lines', 'sheet-tables' ), [
+					[ 'theme', __( 'Theme default', 'sheet-tables' ) ],
+					[ 'none', __( 'None', 'sheet-tables' ) ],
+					[ 'rows', __( 'Between rows', 'sheet-tables' ) ],
+					[ 'all', __( 'Around every cell', 'sheet-tables' ) ],
+				] ),
+				select( props, 'padding', __( 'Cell padding', 'sheet-tables' ), [
+					[ 'theme', __( 'Theme default', 'sheet-tables' ) ],
+					[ 'compact', __( 'Compact', 'sheet-tables' ) ],
+					[ 'roomy', __( 'Roomy', 'sheet-tables' ) ],
+				] ),
+				select( props, 'narrow', __( 'On small screens', 'sheet-tables' ), [
+					[ 'stack', __( 'Stack each row as labelled lines', 'sheet-tables' ) ],
+					[ 'scroll', __( 'Keep the columns and scroll sideways', 'sheet-tables' ) ],
+				], __( 'Either way, everything in the table stays visible.', 'sheet-tables' ) ),
+				toggle( props, 'sticky', __( 'Keep the header row in view while scrolling', 'sheet-tables' ), __( 'The table scrolls inside a box at most as tall as the screen.', 'sheet-tables' ) )
+			);
+		}
+
+		return el.apply( null, [ components.PanelBody, { title: __( 'Layout', 'sheet-tables' ) } ].concat( controls ) );
 	}
 
 	function columnsPanel( props ) {
@@ -113,18 +155,6 @@
 				return el(
 					components.PanelBody,
 					{ key: column.name, title: column.heading, initialOpen: false },
-					el( components.SelectControl, withModern( {
-						label: __( 'Show values as', 'sheet-tables' ),
-						value: current.display || 'text',
-						options: [
-							{ value: 'text', label: __( 'Text', 'sheet-tables' ) },
-							{ value: 'icons', label: __( 'Icons', 'sheet-tables' ) },
-						],
-						help: __( 'Icons replace values such as PDF, Word or Video, or the values listed under Custom icons on the table. Other values stay as text, and every value is still read out by screen readers.', 'sheet-tables' ),
-						onChange: function ( value ) {
-							set( column.name, 'display', value );
-						},
-					} ) ),
 					// Alignment and width shape table columns; a list has none.
 					'list' === attributes.layout
 						? null

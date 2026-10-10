@@ -23,6 +23,7 @@
 	var collator = new Intl.Collator( undefined, { numeric: true, sensitivity: 'base' } );
 	var PAGED_OUT = 'sheet-tables__paged-out';
 	var ALT = 'sheet-tables__alt';
+	var FIRST = 'sheet-tables__first';
 
 	function text( key, fallback ) {
 		return l10n[ key ] || fallback;
@@ -226,6 +227,7 @@
 				var pagedOut = pageSize > 0 && Math.floor( position / pageSize ) + 1 !== page;
 
 				item.classList.toggle( PAGED_OUT, pagedOut );
+				item.classList.toggle( FIRST, ! pagedOut && 0 === shown );
 				item.classList.toggle( ALT, ! pagedOut && 1 === shown++ % 2 );
 			} );
 

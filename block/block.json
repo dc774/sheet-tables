@@ -6,7 +6,11 @@
 	"category": "widgets",
 	"icon": "editor-table",
 	"description": "Shows one of this site's sheet tables.",
-	"keywords": [ "spreadsheet", "google sheets", "csv" ],
+	"keywords": [
+		"spreadsheet",
+		"google sheets",
+		"csv"
+	],
 	"textdomain": "sheet-tables",
 	"attributes": {
 		"id": {
@@ -15,7 +19,10 @@
 		},
 		"layout": {
 			"type": "string",
-			"enum": [ "table", "list" ],
+			"enum": [
+				"table",
+				"list"
+			],
 			"default": "table"
 		},
 		"headingLevel": {
@@ -29,15 +36,82 @@
 		"columns": {
 			"type": "object",
 			"default": {}
+		},
+		"striped": {
+			"type": "boolean",
+			"default": false
+		},
+		"lines": {
+			"type": "string",
+			"enum": [
+				"theme",
+				"none",
+				"rows",
+				"all"
+			],
+			"default": "theme"
+		},
+		"padding": {
+			"type": "string",
+			"enum": [
+				"theme",
+				"compact",
+				"roomy"
+			],
+			"default": "theme"
+		},
+		"narrow": {
+			"type": "string",
+			"enum": [
+				"stack",
+				"scroll"
+			],
+			"default": "stack"
+		},
+		"itemSpacing": {
+			"type": "string",
+			"enum": [
+				"normal",
+				"compact",
+				"roomy"
+			],
+			"default": "normal"
+		},
+		"dividers": {
+			"type": "boolean",
+			"default": false
+		},
+		"labels": {
+			"type": "string",
+			"enum": [
+				"beside",
+				"above"
+			],
+			"default": "beside"
+		},
+		"detailSpacing": {
+			"type": "string",
+			"enum": [
+				"normal",
+				"compact"
+			],
+			"default": "normal"
 		}
 	},
 	"supports": {
 		"html": false,
-		"align": [ "wide", "full" ],
+		"align": [
+			"wide",
+			"full"
+		],
 		"color": {
 			"text": true,
 			"background": true,
-			"link": true
+			"link": true,
+			"__experimentalSkipSerialization": [
+				"text",
+				"background"
+			]
 		},
 		"typography": {
 			"fontSize": true,
@@ -51,15 +125,10 @@
 			"color": true,
 			"radius": true,
 			"style": true,
-			"width": true
+			"width": true,
+			"__experimentalSkipSerialization": true
 		}
 	},
-	"styles": [
-		{ "name": "default", "label": "Default", "isDefault": true },
-		{ "name": "striped", "label": "Striped" },
-		{ "name": "bordered", "label": "Bordered" },
-		{ "name": "compact", "label": "Compact" }
-	],
 	"editorScript": "file:./index.js",
 	"style": "sheet-tables"
 }

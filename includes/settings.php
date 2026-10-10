@@ -45,7 +45,7 @@ function sheet_tables_meta_fields() {
 		'_sheet_tables_icons'         => array(
 			'type'     => 'string',
 			'default'  => '',
-			'sanitize' => 'sanitize_textarea_field',
+			'sanitize' => 'sheet_tables_sanitize_icons',
 		),
 		'_sheet_tables_row_filter'    => array(
 			'type'     => 'string',
@@ -128,6 +128,22 @@ function sheet_tables_register_meta() {
  */
 function sheet_tables_sanitize_url( $url ) {
 	return esc_url_raw( trim( (string) $url ), array( 'https' ) );
+}
+
+/**
+ * The Icons setting, keeping icons pasted as Font Awesome's own code.
+ *
+ * Font Awesome's site gives code such as <i class="fa-solid fa-utensils"></i>.
+ * Plain text sanitizing would remove the whole tag, so the tag is first
+ * reduced to its class names, which is all that is used.
+ *
+ * @param string $text Raw setting.
+ * @return string
+ */
+function sheet_tables_sanitize_icons( $text ) {
+	$text = preg_replace( '#<i\b[^>]*?\bclass\s*=\s*["\']([^"\']*)["\'][^>]*>\s*</i>#i', '$1', (string) $text );
+
+	return sanitize_textarea_field( $text );
 }
 
 /**
@@ -420,10 +436,31 @@ function sheet_tables_render_meta_box( $post ) {
 			</td>
 		</tr>
 		<tr>
-			<th scope="row"><label for="sheet-tables-icons"><?php esc_html_e( 'Custom icons', 'sheet-tables' ); ?></label></th>
+			<th scope="row"><label for="sheet-tables-icons"><?php esc_html_e( 'Icons', 'sheet-tables' ); ?></label></th>
 			<td>
-				<textarea id="sheet-tables-icons" name="sheet_tables_icons" class="large-text code" rows="3"><?php echo esc_textarea( (string) get_post_meta( $post->ID, '_sheet_tables_icons', true ) ); ?></textarea>
-				<p class="description"><?php esc_html_e( 'Optional. For columns the Sheet Table block shows as icons: one per line, a value, a bar, then the web address of its icon image, for example "Recipe | https://example.org/recipe.svg". Upload icons to the Media Library and copy their address. These replace the built-in icons for PDF, Word, Excel, PowerPoint, video, audio, image and web link files. Values with no icon stay as text.', 'sheet-tables' ); ?></p>
+				<textarea id="sheet-tables-icons" name="sheet_tables_icons" class="large-text code" rows="4"><?php echo esc_textarea( (string) get_post_meta( $post->ID, '_sheet_tables_icons', true ) ); ?></textarea>
+				<?php $missing = sheet_tables_missing_icons( $settings ); ?>
+				<?php if ( $missing ) : ?>
+					<div class="notice notice-warning inline"><p>
+						<?php
+						printf(
+							/* translators: %s: list of icon names. */
+							esc_html__( 'These icons were not found, so their values show as text: %s', 'sheet-tables' ),
+							esc_html( implode( ', ', $missing ) )
+						);
+						?>
+					</p></div>
+				<?php endif; ?>
+				<p class="description">
+					<?php esc_html_e( 'Optional. Show some values as icons instead of words, in any column: one per line, the value, a bar, then the icon\'s name, for example "PDF | file-pdf" or "Video | video". Letter case is ignored. Values with no icon stay as words, and every value is still read out by screen readers.', 'sheet-tables' ); ?>
+					<?php
+					printf(
+						/* translators: %s: link to Font Awesome's icon search. */
+						esc_html__( 'Find names in the %s. Solid icons are used unless the line says "regular" or "brands"; you can also paste the code Font Awesome gives you, such as <i class="fa-regular fa-file-pdf"></i>.', 'sheet-tables' ),
+						'<a href="https://fontawesome.com/search?ic=free" target="_blank" rel="noopener">' . esc_html__( 'Font Awesome Free icon search', 'sheet-tables' ) . '</a>'
+					);
+					?>
+				</p>
 			</td>
 		</tr>
 		<tr>

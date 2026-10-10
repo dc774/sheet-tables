@@ -40,11 +40,11 @@ It was built for sheets that are shared working documents, with columns the publ
 **Looks the way you want, without a design tool.**
 
 * Show a table as a table, or as a list: each row a heading (linked, if you like) with its details beneath, as a resource library usually looks.
-* The block has WordPress's own colour, typography, spacing and border settings, so it can use your theme's palette and fonts.
-* Block styles: Striped, Bordered and Compact.
-* Per column, in the block sidebar: alignment and width (tables), whether its label shows (lists), and whether its values show as icons.
-* Built-in file-type icons for PDF, Word, Excel, PowerPoint, video, audio, image and web link values, plus your own icons for any other value. The word is still read out by screen readers, and search and filters still find it.
-* An optional sticky header row for long tables.
+* Table options: striped rows, lines (none, between rows, around every cell), cell padding, a sticky header row, and on small screens either stacked rows or sideways scrolling.
+* List options: space between items, divider lines, labels beside or above their values, and spacing between details.
+* WordPress's own colour and border settings colour the table or list itself, never the filters around it; typography and spacing settings too.
+* Per column, in the block sidebar: alignment and width (tables) and whether its label shows (lists).
+* Show any value as an icon from the Font Awesome Free set bundled with the plugin, such as a PDF icon for "PDF". Only the icons a page uses are sent, with no font to download. The word is still read out by screen readers, and search and filters still find it.
 * On a phone, everything visible on a computer is still there: rows reflow, nothing is hidden.
 
 **Everything else you would expect.**
@@ -53,7 +53,7 @@ It was built for sheets that are shared working documents, with columns the publ
 * Rename any column's heading for display.
 * Turn a column's text into a link using a web address from another column, such as a title linking to its file.
 * Finds the header row even when the sheet has title or instruction rows above it.
-* A block and a shortcode, `[sheet_table id="123"]`. The shortcode also takes `layout="list"`, `style="striped"` (or `bordered`, `compact`), `heading="2"` to `"6"` for list headings, and `sticky="1"`.
+* A block and a shortcode, `[sheet_table id="123"]`. The shortcode also takes the block's appearance options by name: `layout="list"`, `heading="2"` to `"6"`, `sticky="1"`; for tables `striped="1"`, `lines="none|rows|all"`, `padding="compact|roomy"`, `narrow="scroll"`; for lists `itemspacing="compact|roomy"`, `dividers="1"`, `labels="above"`, `detailspacing="compact"`.
 * No account, no premium version, no tracking.
 
 == Installation ==
@@ -108,7 +108,11 @@ Some themes limit the editor to an approved list of blocks. If yours does, add `
 
 = How do icons work? =
 
-In the Sheet Table block's sidebar, open Columns, pick a column such as "Format" or "Type", and set "Show values as" to Icons. Values such as PDF, Word, docx, Excel, xlsx, PowerPoint, Video, Audio, Image or Web page get a built-in icon, drawn in the text colour. For anything else, upload an icon to the Media Library and add a line to the table's "Custom icons" setting, such as `Recipe | https://example.org/wp-content/uploads/recipe.svg`. A value with no icon stays as text.
+In the table's Icons setting, add one line per value: the value, a bar, then a Font Awesome icon name, for example `PDF | file-pdf` or `Video | video`. Any cell, in any column, holding that value then shows the icon instead of the word; in a cell with several values, each is matched on its own. Letter case is ignored, and values with no line stay as words.
+
+Find names with Font Awesome's free icon search (fontawesome.com/search?ic=free). Solid icons are used unless the line says `regular` or `brands`, as in `Web page | brands chrome`, and you can paste the code Font Awesome gives you, such as `<i class="fa-regular fa-file-pdf"></i>`. If a name is not found, the table's edit screen says so.
+
+In the list layout, a column of icons listed before the title column appears beside each heading.
 
 = Is anything from the sheet stored in my database? =
 
@@ -125,14 +129,19 @@ The site's server reads the sheet when a table is shown and its stored copy has 
 
 Google Sheets is provided by Google: [Terms of Service](https://policies.google.com/terms), [Privacy Policy](https://policies.google.com/privacy).
 
+== Credits ==
+
+Icons are from Font Awesome Free 7.3.1 by Fonticons, Inc. (https://fontawesome.com), licensed CC BY 4.0. Their licence is included in `assets/fontawesome/LICENSE.txt`.
+
 == Changelog ==
 
 = 1.2.0 =
 * List layout: each row as a heading with labelled details, with a "Sort by" menu.
-* WordPress colour, typography, spacing and border settings on the block, and Striped, Bordered and Compact block styles.
-* Per-column alignment, width, label and icon settings in the block sidebar.
-* Icons for values: built-in file-type icons, and custom icons from the table settings.
-* Optional sticky header row.
+* Table options (striped rows, lines, cell padding, small-screen behaviour, sticky header) and list options (item spacing, dividers, label position, detail spacing).
+* WordPress colour and border settings apply to the table or list itself; typography and spacing settings too.
+* Per-column alignment, width and label settings in the block sidebar.
+* Icons for values from the bundled Font Awesome Free set, mapped in the table settings.
+* Fixed: empty space could appear below the page footer when a table scrolled inside its box.
 
 = 1.1.0 =
 * Private sheets: read a sheet shared only with the site's Google service account.
