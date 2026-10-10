@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Sheet Tables
  * Description:       Shows a Google Sheet, public or private, as an accessible HTML table. Only the columns you choose are ever stored or shown, and the last good copy keeps serving if the sheet breaks.
- * Version:           1.1.0
+ * Version:           1.2.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            David Cutri
@@ -27,5 +27,6 @@ require_once SHEET_TABLES_DIR . 'includes/post-type.php';
 require_once SHEET_TABLES_DIR . 'includes/settings.php';
 require_once SHEET_TABLES_DIR . 'includes/fetch.php';
 require_once SHEET_TABLES_DIR . 'includes/google.php';
+require_once SHEET_TABLES_DIR . 'includes/icons.php';
 require_once SHEET_TABLES_DIR . 'includes/render.php';
 require_once SHEET_TABLES_DIR . 'includes/status.php';

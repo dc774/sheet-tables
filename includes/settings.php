@@ -42,6 +42,11 @@ function sheet_tables_meta_fields() {
 			'default'  => '',
 			'sanitize' => 'sanitize_textarea_field',
 		),
+		'_sheet_tables_icons'         => array(
+			'type'     => 'string',
+			'default'  => '',
+			'sanitize' => 'sheet_tables_sanitize_icons',
+		),
 		'_sheet_tables_row_filter'    => array(
 			'type'     => 'string',
 			'default'  => '',
@@ -123,6 +128,22 @@ function sheet_tables_register_meta() {
  */
 function sheet_tables_sanitize_url( $url ) {
 	return esc_url_raw( trim( (string) $url ), array( 'https' ) );
+}
+
+/**
+ * The Icons setting, keeping icons pasted as Font Awesome's own code.
+ *
+ * Font Awesome's site gives code such as <i class="fa-solid fa-utensils"></i>.
+ * Plain text sanitizing would remove the whole tag, so the tag is first
+ * reduced to its class names, which is all that is used.
+ *
+ * @param string $text Raw setting.
+ * @return string
+ */
+function sheet_tables_sanitize_icons( $text ) {
+	$text = preg_replace( '#<i\b[^>]*?\bclass\s*=\s*["\']([^"\']*)["\'][^>]*>\s*</i>#i', '$1', (string) $text );
+
+	return sanitize_textarea_field( $text );
 }
 
 /**
@@ -226,7 +247,7 @@ function sheet_tables_parse_row_filter( $text ) {
  *
  * Filter dropdowns are listed by source column name, one per line.
  *
- * @return array{url: string, access: string, columns: array<string, string>, links: array<string, string>, row_filter: array, markers: string[], cache_minutes: int, caption: string, sort: bool, search: bool, facets: string[], separator: string, page_size: int}
+ * @return array{url: string, access: string, columns: array<string, string>, links: array<string, string>, icons: array<string, string>, row_filter: array, markers: string[], cache_minutes: int, caption: string, sort: bool, search: bool, facets: string[], separator: string, page_size: int}
  */
 function sheet_tables_get_settings( $post_id ) {
 	$markers = explode( ',', (string) get_post_meta( $post_id, '_sheet_tables_markers', true ) );
@@ -236,6 +257,7 @@ function sheet_tables_get_settings( $post_id ) {
 		'access'        => sheet_tables_sanitize_access( get_post_meta( $post_id, '_sheet_tables_access', true ) ),
 		'columns'       => sheet_tables_parse_columns( get_post_meta( $post_id, '_sheet_tables_columns', true ) ),
 		'links'         => sheet_tables_parse_columns( get_post_meta( $post_id, '_sheet_tables_links', true ) ),
+		'icons'         => sheet_tables_parse_columns( get_post_meta( $post_id, '_sheet_tables_icons', true ) ),
 		'row_filter'    => sheet_tables_parse_row_filter( get_post_meta( $post_id, '_sheet_tables_row_filter', true ) ),
 		'markers'       => array_values( array_filter( array_map( 'trim', $markers ), 'strlen' ) ),
 		'cache_minutes' => sheet_tables_sanitize_minutes( get_post_meta( $post_id, '_sheet_tables_cache_minutes', true ) ),
@@ -411,6 +433,34 @@ function sheet_tables_render_meta_box( $post ) {
 			<td>
 				<textarea id="sheet-tables-links" name="sheet_tables_links" class="large-text code" rows="3"><?php echo esc_textarea( (string) get_post_meta( $post->ID, '_sheet_tables_links', true ) ); ?></textarea>
 				<p class="description"><?php esc_html_e( 'Optional. Make a column\'s text a link: one per line, the column shown, a bar, then the column holding the web address, for example "Title | Public URL". The address column is read for this, but shown only if it is also listed under Columns. Only http and https addresses become links.', 'sheet-tables' ); ?></p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><label for="sheet-tables-icons"><?php esc_html_e( 'Icons', 'sheet-tables' ); ?></label></th>
+			<td>
+				<textarea id="sheet-tables-icons" name="sheet_tables_icons" class="large-text code" rows="4"><?php echo esc_textarea( (string) get_post_meta( $post->ID, '_sheet_tables_icons', true ) ); ?></textarea>
+				<?php $missing = sheet_tables_missing_icons( $settings ); ?>
+				<?php if ( $missing ) : ?>
+					<div class="notice notice-warning inline"><p>
+						<?php
+						printf(
+							/* translators: %s: list of icon names. */
+							esc_html__( 'These icons were not found, so their values show as text: %s', 'sheet-tables' ),
+							esc_html( implode( ', ', $missing ) )
+						);
+						?>
+					</p></div>
+				<?php endif; ?>
+				<p class="description">
+					<?php esc_html_e( 'Optional. Show some values as icons instead of words, in any column: one per line, the value, a bar, then the icon\'s name, for example "PDF | file-pdf" or "Video | video". Letter case is ignored. Values with no icon stay as words, and every value is still read out by screen readers.', 'sheet-tables' ); ?>
+					<?php
+					printf(
+						/* translators: %s: link to Font Awesome's icon search. */
+						esc_html__( 'Find names in the %s. Solid icons are used unless the line says "regular" or "brands"; you can also paste the code Font Awesome gives you, such as <i class="fa-regular fa-file-pdf"></i>.', 'sheet-tables' ),
+						'<a href="https://fontawesome.com/search?ic=free" target="_blank" rel="noopener">' . esc_html__( 'Font Awesome Free icon search', 'sheet-tables' ) . '</a>'
+					);
+					?>
+				</p>
 			</td>
 		</tr>
 		<tr>
