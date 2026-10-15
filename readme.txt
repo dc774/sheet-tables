@@ -4,7 +4,7 @@ Tags: google sheets, spreadsheet, table, csv, shortcode
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -37,13 +37,23 @@ It was built for sheets that are shared working documents, with columns the publ
 * Works without JavaScript: visitors get the complete table in sheet order.
 * No libraries and nothing loaded from a CDN. The stylesheet and script load only on pages that show a table.
 
+**Looks the way you want, without a design tool.**
+
+* Show a table as a table, or as a list: each row a heading (linked, if you like) with its details beneath, as a resource library usually looks.
+* Table options: striped rows, lines (none, between rows, around every cell), cell padding, a sticky header row, and on small screens either stacked rows or sideways scrolling.
+* List options: space between items, divider lines, labels beside or above their values, and spacing between details.
+* WordPress's own colour and border settings colour the table or list itself, never the filters around it; typography and spacing settings too.
+* Per column, in the block sidebar: alignment and width (tables) and whether its label shows (lists).
+* Show any value as an icon from the Font Awesome Free set bundled with the plugin, such as a PDF icon for "PDF". Only the icons a page uses are sent, with no font to download. The word is still read out by screen readers, and search and filters still find it.
+* On a phone, everything visible on a computer is still there: rows reflow, nothing is hidden.
+
 **Everything else you would expect.**
 
 * Any number of tables, each with its own sheet, columns, headings and refresh interval.
 * Rename any column's heading for display.
 * Turn a column's text into a link using a web address from another column, such as a title linking to its file.
 * Finds the header row even when the sheet has title or instruction rows above it.
-* A block and a shortcode, `[sheet_table id="123"]`.
+* A block and a shortcode, `[sheet_table id="123"]`. The shortcode also takes the block's appearance options by name: `layout="list"`, `heading="2"` to `"6"`, `sticky="1"`; for tables `striped="1"`, `lines="none|rows|all"`, `padding="compact|roomy"`, `narrow="scroll"`; for lists `itemspacing="compact|roomy"`, `dividers="1"`, `labels="above"`, `detailspacing="compact"`.
 * No account, no premium version, no tracking.
 
 == Installation ==
@@ -96,6 +106,14 @@ To make a column required, list it under "Header row" too. The header row is the
 
 Some themes limit the editor to an approved list of blocks. If yours does, add `sheet-tables/table` to that list to use the Sheet Table block, or ask whoever maintains the theme to add it. In the meantime the shortcode works in any paragraph: type `[sheet_table id="123"]`, using the id shown on the table's edit screen.
 
+= How do icons work? =
+
+In the table's Icons setting, add one line per value: the value, a bar, then a Font Awesome icon name, for example `PDF | file-pdf` or `Video | video`. Any cell, in any column, holding that value then shows the icon instead of the word; in a cell with several values, each is matched on its own. Letter case is ignored, and values with no line stay as words.
+
+Find names with Font Awesome's free icon search (fontawesome.com/search?ic=free). Solid icons are used unless the line says `regular` or `brands`, as in `Web page | brands chrome`, and you can paste the code Font Awesome gives you, such as `<i class="fa-regular fa-file-pdf"></i>`. If a name is not found, the table's edit screen says so.
+
+In the list layout, a column of icons listed before the title column appears beside each heading.
+
 = Is anything from the sheet stored in my database? =
 
 Only the columns you chose: the current copy (as a transient) and the last good copy (as an option), both removed when the table or the plugin is deleted.
@@ -111,7 +129,19 @@ The site's server reads the sheet when a table is shown and its stored copy has 
 
 Google Sheets is provided by Google: [Terms of Service](https://policies.google.com/terms), [Privacy Policy](https://policies.google.com/privacy).
 
+== Credits ==
+
+Icons are from Font Awesome Free 7.3.1 by Fonticons, Inc. (https://fontawesome.com), licensed CC BY 4.0. Their licence is included in `assets/fontawesome/LICENSE.txt`.
+
 == Changelog ==
+
+= 1.2.0 =
+* List layout: each row as a heading with labelled details, with a "Sort by" menu.
+* Table options (striped rows, lines, cell padding, small-screen behaviour, sticky header) and list options (item spacing, dividers, label position, detail spacing).
+* WordPress colour and border settings apply to the table or list itself; typography and spacing settings too.
+* Per-column alignment, width and label settings in the block sidebar.
+* Icons for values from the bundled Font Awesome Free set, mapped in the table settings.
+* Fixed: empty space could appear below the page footer when a table scrolled inside its box.
 
 = 1.1.0 =
 * Private sheets: read a sheet shared only with the site's Google service account.

@@ -1,12 +1,21 @@
 /* Sheet Tables.
  *
  * Deliberately light. The theme already styles tables, so this adds only what
- * a plain table lacks: sideways scrolling when it is too wide, the sort and
- * filter controls, stacked rows on a phone, and print. No colours are set, so
- * the table takes the theme's. */
+ * a plain table lacks: sideways scrolling, the visitor tools, the list
+ * layout, each layout's own options, stacked rows on a phone, and print. No
+ * colours are set, so everything takes the theme's unless the block's own
+ * colour settings say otherwise. Nothing visible on a computer is hidden on a
+ * phone: layouts reflow, nothing is dropped. */
 
 .sheet-tables {
 	margin-block: 1.5em;
+}
+
+/* Positioned, so the visually hidden text inside rows scrolled out of view
+ * stays inside the box instead of stretching the page below the footer. */
+.sheet-tables__scroll,
+.sheet-tables__list {
+	position: relative;
 }
 
 .sheet-tables__scroll {
@@ -24,6 +33,20 @@
 	vertical-align: top;
 }
 
+/* Text for screen readers only. The plugin's own, so it works in any theme. */
+.sheet-tables .sheet-tables__sr {
+	position: absolute !important;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Visitor tools. */
 .sheet-tables__controls {
 	display: flex;
 	flex-wrap: wrap;
@@ -43,8 +66,12 @@
 	max-width: 100%;
 }
 
-/* Rows on other pages. Not [hidden], so print can still show them. */
-.sheet-tables__table tr.sheet-tables__paged-out {
+.sheet-tables__count {
+	margin-block: 0 0.5em;
+	font-size: 0.9em;
+}
+
+.sheet-tables__count:empty {
 	display: none;
 }
 
@@ -57,15 +84,6 @@
 }
 
 .sheet-tables__pager[hidden] {
-	display: none;
-}
-
-.sheet-tables__count {
-	margin-block: 0 0.5em;
-	font-size: 0.9em;
-}
-
-.sheet-tables__count:empty {
 	display: none;
 }
 
@@ -111,46 +129,284 @@
 	opacity: 1;
 }
 
-/* On a narrow screen each row becomes a block of labelled lines. The labels
- * come from the data-label attribute written on every cell at render time.
- * The header row is removed rather than visually hidden, so its sort buttons
- * cannot take keyboard focus while unseen. */
+/* Icons: inline Font Awesome shapes in the text colour. */
+.sheet-tables__icon {
+	display: inline-flex;
+	vertical-align: -0.2em;
+}
+
+.sheet-tables__fa {
+	width: 1.25em;
+	height: 1.25em;
+}
+
+/* The icon shapes, written once per page and referenced by every icon. */
+.sheet-tables__symbols {
+	position: absolute;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+}
+
+/* Table layout. */
+
+/* Rows on other pages. Not [hidden], so print can still show them. */
+.sheet-tables__table tr.sheet-tables__paged-out {
+	display: none;
+}
+
+/* Per-column alignment and widths, chosen in the block sidebar. */
+.sheet-tables .sheet-tables__align-center {
+	text-align: center;
+}
+
+.sheet-tables .sheet-tables__align-end {
+	text-align: end;
+}
+
+.sheet-tables__table .sheet-tables__width-narrow {
+	min-width: 8em;
+}
+
+.sheet-tables__table .sheet-tables__width-medium {
+	min-width: 15em;
+}
+
+.sheet-tables__table .sheet-tables__width-wide {
+	min-width: 25em;
+}
+
+/* Striped rows. Once the script runs it marks the stripes itself, so they
+ * stay even while rows are filtered or paged. */
+.sheet-tables--striped:not(.is-enhanced) tbody tr:nth-child(even),
+.sheet-tables--striped.is-enhanced tbody tr.sheet-tables__alt {
+	background-color: color-mix(in srgb, currentColor 7%, transparent);
+}
+
+/* Lines. "Theme" adds no rule, leaving the theme's own. */
+.sheet-tables--lines-none .sheet-tables__table :is(th, td) {
+	border: 0;
+}
+
+.sheet-tables--lines-rows .sheet-tables__table :is(th, td) {
+	border: 0;
+	border-block-end: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+}
+
+.sheet-tables--lines-all .sheet-tables__table :is(th, td) {
+	border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+}
+
+/* Cell padding. "Theme" adds no rule. */
+.sheet-tables--padding-compact .sheet-tables__table :is(th, td) {
+	padding: 0.25em 0.5em;
+}
+
+.sheet-tables--padding-roomy .sheet-tables__table :is(th, td) {
+	padding: 0.75em 1em;
+}
+
+/* Sticky header: the header can only stick inside a box that scrolls, so the
+ * scroll box gets a height. The background stops rows showing through; set
+ * --sheet-tables-header-background to match a coloured page. */
+.has-sticky-header .sheet-tables__scroll {
+	max-height: 80vh;
+	overflow: auto;
+}
+
+/* Some themes give tables overflow: hidden, which makes the table itself the
+ * box the header sticks to, so it never moves. */
+.has-sticky-header .sheet-tables__table {
+	overflow: visible;
+}
+
+.has-sticky-header .sheet-tables__table thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background-color: var(--sheet-tables-header-background, Canvas);
+}
+
+/* With the block's background colour on the table, the header takes it,
+ * passed down through the elements in between. */
+.has-sticky-header .sheet-tables__scroll.has-background :is(.sheet-tables__table, thead, thead tr, thead th) {
+	background-color: inherit;
+}
+
+/* List layout. */
+.sheet-tables__caption {
+	font-weight: 700;
+}
+
+.sheet-tables--list {
+	--sheet-tables-item-gap: 1.25em;
+	--sheet-tables-detail-gap: 0.35em;
+}
+
+.sheet-tables--spacing-compact {
+	--sheet-tables-item-gap: 0.5em;
+}
+
+.sheet-tables--spacing-roomy {
+	--sheet-tables-item-gap: 2em;
+}
+
+.sheet-tables--details-compact {
+	--sheet-tables-detail-gap: 0.1em;
+}
+
+.sheet-tables__list {
+	display: grid;
+	gap: var(--sheet-tables-item-gap);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+/* With the block's background colour on the list, give it some room. */
+.sheet-tables__list.has-background {
+	padding: 1em;
+}
+
+.sheet-tables__list > [hidden],
+.sheet-tables__list > .sheet-tables__paged-out {
+	display: none;
+}
+
+/* Divider lines: a line above every item but the first one showing, centred
+ * in the gap. */
+.sheet-tables--dividers .sheet-tables__list {
+	row-gap: calc(var(--sheet-tables-item-gap) / 2);
+}
+
+.sheet-tables--dividers .sheet-tables__item {
+	padding-block-start: calc(var(--sheet-tables-item-gap) / 2);
+	border-block-start: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+}
+
+/* The script marks the first item showing, so filtering never leaves a line
+ * above the first result. */
+.sheet-tables--dividers:not(.is-enhanced) .sheet-tables__item:first-child,
+.sheet-tables--dividers.is-enhanced .sheet-tables__item.sheet-tables__first {
+	padding-block-start: 0;
+	border-block-start: 0;
+}
+
+.sheet-tables__title {
+	display: flex;
+	gap: 0.5em;
+	align-items: flex-start;
+	margin: 0 0 0.35em;
+	font-size: 1.15em;
+}
+
+.sheet-tables__lead {
+	flex: none;
+}
+
+/* The theme's own description list styling (indents, rules, spacing) is
+ * reset inside the list only. */
+.sheet-tables .sheet-tables__details,
+.sheet-tables .sheet-tables__details dt,
+.sheet-tables .sheet-tables__details dd {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+}
+
+.sheet-tables__details {
+	display: grid;
+	gap: var(--sheet-tables-detail-gap) 1em;
+}
+
+.sheet-tables__detail {
+	display: contents;
+}
+
+.sheet-tables .sheet-tables__details dt {
+	font-weight: 700;
+}
+
+/* Labels beside their values, on one line at every width; the label column
+ * takes what it needs up to 40% and values wrap beside it. */
+.sheet-tables--labels-beside .sheet-tables__details {
+	grid-template-columns: fit-content(40%) 1fr;
+}
+
+/* A detail whose label is hidden takes the whole line. */
+.sheet-tables--labels-beside .sheet-tables__details .sheet-tables__sr + dd {
+	grid-column: 1 / -1;
+}
+
+/* Labels above their values. */
+.sheet-tables--labels-above .sheet-tables__details {
+	grid-template-columns: 1fr;
+	row-gap: 0;
+}
+
+.sheet-tables--labels-above .sheet-tables__detail + .sheet-tables__detail dt {
+	margin-block-start: var(--sheet-tables-detail-gap);
+}
+
+/* Small screens. */
 @media screen and (max-width: 40em) {
-	.sheet-tables__table thead {
+	.sheet-tables__control,
+	.sheet-tables__control :is(input, select) {
+		width: 100%;
+	}
+
+	.has-sticky-header .sheet-tables__scroll {
+		max-height: none;
+	}
+
+	/* Stacked tables: each row becomes a block of labelled lines. The labels
+	 * come from the data-label attribute written on every cell. The header row
+	 * is removed rather than visually hidden, so its sort buttons cannot take
+	 * keyboard focus while unseen; every heading is repeated as a label. */
+	.sheet-tables--stack .sheet-tables__table thead {
 		display: none;
 	}
 
-	.sheet-tables__table,
-	.sheet-tables__table tbody,
-	.sheet-tables__table tr {
+	.sheet-tables--stack .sheet-tables__table,
+	.sheet-tables--stack .sheet-tables__table tbody,
+	.sheet-tables--stack .sheet-tables__table tr {
 		display: block;
 	}
 
-	.sheet-tables__table tr {
+	.sheet-tables--stack .sheet-tables__table tr {
 		padding-block: 0.5em;
-		border-block-end: 1px solid rgba(128, 128, 128, 0.4);
+		border-block-end: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+	}
+
+	.sheet-tables--stack.sheet-tables--lines-none .sheet-tables__table tr {
+		border: 0;
 	}
 
 	/* The display: block above outranks the browser's own [hidden] rule, so
 	 * rows the filter hides have to be hidden again here. */
-	.sheet-tables__table tr[hidden],
-	.sheet-tables__table tr.sheet-tables__paged-out {
+	.sheet-tables--stack .sheet-tables__table tr[hidden],
+	.sheet-tables--stack .sheet-tables__table tr.sheet-tables__paged-out {
 		display: none;
 	}
 
-	.sheet-tables__table td {
+	/* Column alignment and cell borders are for real columns; stacked lines
+	 * all start at the same edge and only rows are separated. */
+	.sheet-tables--stack .sheet-tables__table td {
 		display: grid;
 		grid-template-columns: minmax(6em, 35%) 1fr;
 		gap: 0.75em;
+		padding-block: 0.2em;
 		border: 0;
+		text-align: start;
 	}
 
-	.sheet-tables__table td::before {
+	.sheet-tables--stack .sheet-tables__table td::before {
 		content: attr(data-label);
 		font-weight: 700;
 	}
 
-	.sheet-tables__table td:empty {
+	.sheet-tables--stack .sheet-tables__table td:empty {
 		display: none;
 	}
 }
@@ -166,7 +422,9 @@
 		display: none;
 	}
 
-	.sheet-tables__scroll {
+	.sheet-tables__scroll,
+	.has-sticky-header .sheet-tables__scroll {
+		max-height: none;
 		overflow: visible;
 	}
 
@@ -174,12 +432,18 @@
 		display: table-header-group;
 	}
 
-	.sheet-tables__table tr {
+	.sheet-tables__table tr,
+	.sheet-tables__item {
 		break-inside: avoid;
 	}
 
 	.sheet-tables__table tr[hidden],
 	.sheet-tables__table tr.sheet-tables__paged-out {
 		display: table-row !important;
+	}
+
+	.sheet-tables__list > [hidden],
+	.sheet-tables__list > .sheet-tables__paged-out {
+		display: block !important;
 	}
 }
