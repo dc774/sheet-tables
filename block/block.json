@@ -1,0 +1,22 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "sheet-tables/table",
+	"title": "Sheet Table",
+	"category": "widgets",
+	"icon": "editor-table",
+	"description": "Shows one of this site's sheet tables.",
+	"keywords": [ "spreadsheet", "google sheets", "csv" ],
+	"textdomain": "sheet-tables",
+	"attributes": {
+		"id": {
+			"type": "integer",
+			"default": 0
+		}
+	},
+	"supports": {
+		"html": false,
+		"align": [ "wide", "full" ]
+	},
+	"editorScript": "file:./index.js"
+}
